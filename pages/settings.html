@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FoodERP Lite — Settings</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="mark">F</div><div class="name" id="brandName">FoodERP Lite</div></div>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <div class="section-label">Masters</div>
+      <a href="products.html">Products</a>
+      <a href="categories.html">Categories</a>
+      <a href="customers.html">Customers</a>
+      <a href="suppliers.html">Suppliers</a>
+      <div class="section-label">Operations</div>
+      <a href="purchase.html">Purchase</a>
+      <a href="production.html">Production</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="sales.html">Sales</a>
+      <div class="section-label">Tools</div>
+      <a href="reports.html">Reports</a>
+      <a href="sync.html">Sync</a>
+      <a href="settings.html" class="active">Settings</a>
+    </nav>
+    <button class="logout-btn" id="logoutBtn">Log Out</button>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div><h1>Settings</h1><div class="greeting">Company details, invoicing, and backups</div></div>
+    </div>
+
+    <div class="section-card">
+      <h2 style="font-size:1.1rem;">Company Details</h2>
+      <p style="color:var(--color-text-muted); font-size:0.9rem; margin-bottom:14px;">Shown on receipts and labels</p>
+
+      <div class="image-upload" style="margin-bottom:16px;">
+        <div class="image-preview" id="logoPreview" style="width:64px; height:64px;">🏢</div>
+        <div style="flex:1;">
+          <label for="logoFile">Company Logo (optional)</label>
+          <input type="file" id="logoFile" accept="image/*" />
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="field full">
+          <label for="companyName">Business Name</label>
+          <input type="text" id="companyName" placeholder="e.g. Sundari Foods" />
+        </div>
+        <div class="field">
+          <label for="companyGst">GST Number</label>
+          <input type="text" id="companyGst" placeholder="e.g. 22AAAAA0000A1Z5" />
+        </div>
+        <div class="field">
+          <label for="companyFssai">FSSAI License No.</label>
+          <input type="text" id="companyFssai" />
+        </div>
+        <div class="field full">
+          <label for="companyAddress">Address</label>
+          <input type="text" id="companyAddress" />
+        </div>
+      </div>
+      <button class="btn btn-primary" id="saveCompanyBtn" style="width:auto; padding:12px 24px; margin-top:10px;">Save Company Details</button>
+      <span class="form-error" id="companySaved" style="margin-left:10px;"></span>
+    </div>
+
+    <div class="section-card">
+      <h2 style="font-size:1.1rem;">Invoice Numbering</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label for="invoicePrefix">Invoice Prefix</label>
+          <input type="text" id="invoicePrefix" placeholder="e.g. INV-" />
+        </div>
+        <div class="field">
+          <label for="lastInvoiceNo">Next Invoice Number</label>
+          <input type="number" id="lastInvoiceNo" min="0" />
+        </div>
+      </div>
+      <button class="btn btn-primary" id="saveInvoiceBtn" style="width:auto; padding:12px 24px; margin-top:10px;">Save</button>
+      <span class="form-error" id="invoiceSaved" style="margin-left:10px;"></span>
+    </div>
+
+    <div class="section-card">
+      <h2 style="font-size:1.1rem;">App Name</h2>
+      <p style="color:var(--color-text-muted); font-size:0.9rem; margin-bottom:14px;">
+        This changes the name shown inside the app (sidebar, login screen). It's separate from
+        "Business Name" above, which appears on printed receipts and labels.
+      </p>
+      <div class="field">
+        <label for="appName">App Display Name</label>
+        <input type="text" id="appName" placeholder="e.g. FoodERP Lite" />
+      </div>
+      <button class="btn btn-primary" id="saveAppNameBtn" style="width:auto; padding:12px 24px;">Save</button>
+      <span class="form-error" id="appNameSaved" style="margin-left:10px;"></span>
+      <p style="color:var(--color-text-muted); font-size:0.8rem; margin-top:12px;">
+        Note: this doesn't change the name under the icon after "Add to Home Screen" — that comes
+        from <code>manifest.json</code> and needs to be edited in the project files directly, then
+        the icon reinstalled.
+      </p>
+    </div>
+
+    <div class="section-card">
+      <h2 style="font-size:1.1rem;">Change Operator PIN</h2>
+      <p style="color:var(--color-text-muted); font-size:0.9rem; margin-bottom:14px;">
+        This is the 4-digit PIN used on the operator login screen (default was <code>1234</code> —
+        change it before real use).
+      </p>
+      <div class="form-grid">
+        <div class="field">
+          <label for="newPin">New 4-Digit PIN</label>
+          <input type="password" id="newPin" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="••••" />
+        </div>
+        <div class="field">
+          <label for="confirmPin">Confirm New PIN</label>
+          <input type="password" id="confirmPin" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="••••" />
+        </div>
+      </div>
+      <button class="btn btn-primary" id="savePinBtn" style="width:auto; padding:12px 24px;">Update PIN</button>
+      <span class="form-error" id="pinSaved" style="margin-left:10px;"></span>
+    </div>
+
+    <div class="section-card">
+      <h2 style="font-size:1.1rem;">Change Admin Password</h2>
+      <p style="color:var(--color-text-muted); font-size:0.9rem; margin-bottom:14px;">
+        Default was <code>admin</code> / <code>admin123</code> — change this before real use too.
+      </p>
+      <div class="form-grid">
+        <div class="field full">
+          <label for="currentPassword">Current Password</label>
+          <input type="password" id="currentPassword" />
+        </div>
+        <div class="field">
+          <label for="newPassword">New Password</label>
+          <input type="password" id="newPassword" />
+        </div>
+        <div class="field">
+          <label for="confirmPassword">Confirm New Password</label>
+          <input type="password" id="confirmPassword" />
+        </div>
+      </div>
+      <button class="btn btn-primary" id="savePasswordBtn" style="width:auto; padding:12px 24px;">Update Password</button>
+      <span class="form-error" id="passwordSaved" style="margin-left:10px;"></span>
+    </div>
+
+    <div class="section-card">
+      <h2 style="font-size:1.1rem;">Backup &amp; Restore</h2>
+      <p style="color:var(--color-text-muted); font-size:0.9rem; margin-bottom:14px;">
+        Everything lives only on this device's browser storage — export a backup regularly,
+        especially before clearing browser data or switching phones.
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-accent" id="exportJsonBtn" style="width:auto; padding:12px 20px;">⬇ Export Full Backup (JSON)</button>
+        <label class="btn btn-ghost" style="width:auto; padding:12px 20px; cursor:pointer;">
+          ⬆ Restore from Backup
+          <input type="file" id="restoreFile" accept="application/json" style="display:none;" />
+        </label>
+      </div>
+      <div class="form-error" id="backupStatus" style="margin-top:10px;"></div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script>
+  let logoData = "";
+  const STORE_NAMES = ["users", "categories", "products", "customers", "suppliers", "inventory",
+    "purchase", "purchase_items", "sales", "sale_items", "production", "payments", "settings",
+    "sync_queue", "printer", "logs"];
+
+  document.getElementById("logoFile").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      logoData = reader.result;
+      document.getElementById("logoPreview").innerHTML = `<img src="${logoData}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById("saveCompanyBtn").addEventListener("click", async () => {
+    const value = {
+      name: document.getElementById("companyName").value.trim(),
+      gst: document.getElementById("companyGst").value.trim(),
+      fssai: document.getElementById("companyFssai").value.trim(),
+      address: document.getElementById("companyAddress").value.trim(),
+      logo: logoData,
+    };
+    await DB.put("settings", { key: "company", value });
+    const status = document.getElementById("companySaved");
+    status.style.color = "var(--color-success)";
+    status.textContent = "Saved.";
+    setTimeout(() => (status.textContent = ""), 2000);
+  });
+
+  document.getElementById("saveInvoiceBtn").addEventListener("click", async () => {
+    await DB.put("settings", { key: "invoicePrefix", value: document.getElementById("invoicePrefix").value.trim() || "INV-" });
+    await DB.put("settings", { key: "lastInvoiceNo", value: Number(document.getElementById("lastInvoiceNo").value || 0) });
+    const status = document.getElementById("invoiceSaved");
+    status.style.color = "var(--color-success)";
+    status.textContent = "Saved.";
+    setTimeout(() => (status.textContent = ""), 2000);
+  });
+
+  document.getElementById("saveAppNameBtn").addEventListener("click", async () => {
+    const name = document.getElementById("appName").value.trim() || "FoodERP Lite";
+    await DB.put("settings", { key: "appName", value: name });
+    await applyBranding();
+    const status = document.getElementById("appNameSaved");
+    status.style.color = "var(--color-success)";
+    status.textContent = "Saved.";
+    setTimeout(() => (status.textContent = ""), 2000);
+  });
+
+  document.getElementById("savePinBtn").addEventListener("click", async () => {
+    const status = document.getElementById("pinSaved");
+    const pin = document.getElementById("newPin").value;
+    const confirmPin = document.getElementById("confirmPin").value;
+
+    if (!/^\d{4}$/.test(pin)) {
+      status.style.color = "var(--color-danger)";
+      status.textContent = "PIN must be exactly 4 digits.";
+      return;
+    }
+    if (pin !== confirmPin) {
+      status.style.color = "var(--color-danger)";
+      status.textContent = "PINs don't match.";
+      return;
+    }
+
+    const users = await DB.getAll("users");
+    const operator = users.find((u) => u.type === "operator");
+    if (!operator) {
+      status.style.color = "var(--color-danger)";
+      status.textContent = "No operator account found.";
+      return;
+    }
+    await DB.put("users", { ...operator, pin });
+    document.getElementById("newPin").value = "";
+    document.getElementById("confirmPin").value = "";
+    status.style.color = "var(--color-success)";
+    status.textContent = "✅ PIN updated.";
+    setTimeout(() => (status.textContent = ""), 2500);
+  });
+
+  document.getElementById("savePasswordBtn").addEventListener("click", async () => {
+    const status = document.getElementById("passwordSaved");
+    const current = document.getElementById("currentPassword").value;
+    const next = document.getElementById("newPassword").value;
+    const confirmNext = document.getElementById("confirmPassword").value;
+
+    const users = await DB.getAll("users");
+    const admin = users.find((u) => u.type === "admin");
+    if (!admin) {
+      status.style.color = "var(--color-danger)";
+      status.textContent = "No admin account found.";
+      return;
+    }
+    if (current !== admin.password) {
+      status.style.color = "var(--color-danger)";
+      status.textContent = "Current password is incorrect.";
+      return;
+    }
+    if (next.length < 4) {
+      status.style.color = "var(--color-danger)";
+      status.textContent = "New password should be at least 4 characters.";
+      return;
+    }
+    if (next !== confirmNext) {
+      status.style.color = "var(--color-danger)";
+      status.textContent = "New passwords don't match.";
+      return;
+    }
+
+    await DB.put("users", { ...admin, password: next });
+    document.getElementById("currentPassword").value = "";
+    document.getElementById("newPassword").value = "";
+    document.getElementById("confirmPassword").value = "";
+    status.style.color = "var(--color-success)";
+    status.textContent = "✅ Password updated.";
+    setTimeout(() => (status.textContent = ""), 2500);
+  });
+
+  document.getElementById("exportJsonBtn").addEventListener("click", async () => {
+    const backup = { exportedAt: new Date().toISOString(), data: {} };
+    for (const store of STORE_NAMES) {
+      backup.data[store] = await DB.getAll(store);
+    }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `fooderp-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById("restoreFile").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById("backupStatus");
+    if (!confirm("This will REPLACE all current data on this device with the backup file. Continue?")) {
+      e.target.value = "";
+      return;
+    }
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text);
+      if (!backup.data) throw new Error("This doesn't look like a FoodERP backup file.");
+
+      await DB.clearAll();
+      for (const store of STORE_NAMES) {
+        const rows = backup.data[store] || [];
+        for (const row of rows) {
+          await DB.put(store, row);
+        }
+      }
+      statusEl.style.color = "var(--color-success)";
+      statusEl.textContent = "✅ Restore complete. Reloading…";
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (err) {
+      statusEl.style.color = "var(--color-danger)";
+      statusEl.textContent = "❌ Restore failed: " + err.message;
+    }
+    e.target.value = "";
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => { if (confirm("Log out now?")) logout(); });
+
+  (async () => {
+    await initDB();
+    await applyBranding();
+    const session = requireSession(["admin"]);
+    if (!session) return;
+
+    const companyRec = await DB.get("settings", "company");
+    const company = companyRec ? companyRec.value : {};
+    document.getElementById("companyName").value = company.name || "";
+    document.getElementById("companyGst").value = company.gst || "";
+    document.getElementById("companyFssai").value = company.fssai || "";
+    document.getElementById("companyAddress").value = company.address || "";
+    if (company.logo) {
+      logoData = company.logo;
+      document.getElementById("logoPreview").innerHTML = `<img src="${logoData}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`;
+    }
+
+    const prefixRec = await DB.get("settings", "invoicePrefix");
+    const lastNoRec = await DB.get("settings", "lastInvoiceNo");
+    document.getElementById("invoicePrefix").value = prefixRec ? prefixRec.value : "INV-";
+    document.getElementById("lastInvoiceNo").value = lastNoRec ? lastNoRec.value : 0;
+
+    const appNameRec = await DB.get("settings", "appName");
+    document.getElementById("appName").value = appNameRec ? appNameRec.value : "FoodERP Lite";
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "appId": "com.fooderp.lite",
+  "appName": "FoodERP Lite",
+  "webDir": ".",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>FoodERP Lite — Dashboard</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">F</div>
+      <div class="name" id="brandName">FoodERP Lite</div>
+    </div>
+
+    <nav>
+      <a href="dashboard.html" class="active">Dashboard</a>
+
+      <div class="section-label">Masters</div>
+      <a href="products.html">Products</a>
+      <a href="categories.html">Categories</a>
+      <a href="customers.html">Customers</a>
+      <a href="suppliers.html">Suppliers</a>
+
+      <div class="section-label">Operations</div>
+      <a href="purchase.html">Purchase</a>
+      <a href="production.html">Production</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="sales.html">Sales</a>
+
+      <div class="section-label">Tools</div>
+      <a href="reports.html">Reports</a>
+      <a href="sync.html">Sync</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+
+    <button class="logout-btn" id="logoutBtn">Log Out</button>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <h1>Dashboard</h1>
+        <div class="greeting">Welcome back, <span id="adminName">Admin</span></div>
+      </div>
+      <div class="status-pills">
+        <span class="pill" id="internetPill"><span class="dot"></span> Checking…</span>
+        <span class="pill" id="bluetoothPill"><span class="dot"></span> Bluetooth: Not connected</span>
+      </div>
+    </div>
+
+    <div class="card-grid">
+      <div class="stat-card">
+        <div class="label">Today's Sales</div>
+        <div class="value" id="todaySales">₹0</div>
+        <div class="hint">0 invoices today</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Today's Orders</div>
+        <div class="value" id="todayOrders">0</div>
+        <div class="hint">Since midnight</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Stock Value</div>
+        <div class="value" id="stockValue">₹0</div>
+        <div class="hint" id="productCountHint">0 products</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Low Stock</div>
+        <div class="value danger" id="lowStock">0</div>
+        <div class="hint">Items below reorder level</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Pending Sync</div>
+        <div class="value" id="pendingSync">0</div>
+        <div class="hint">Records waiting to reach Google Sheets</div>
+      </div>
+    </div>
+
+    <div class="section-card" style="margin-top:24px;">
+      <h2 style="font-size:1.1rem;">Build Progress</h2>
+      <p style="color:var(--color-text-muted); font-size:0.95rem;">
+        All 8 phases are complete — structure &amp; offline database, all masters,
+        purchase/production/inventory, sales &amp; billing, Bluetooth/barcode/QR, reports,
+        Google Sheets sync, and Settings/Backup. See <strong>PHASE8_DEPLOYMENT.md</strong> in the
+        project folder for how to install this on a phone and (optionally) build an Android APK.
+      </p>
+    </div>
+  </main>
+</div>
+
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/sync.js"></script>
+<script>
+  (async () => {
+    await initDB();
+    await applyBranding();
+    const session = requireSession(["admin"]);
+    if (!session) return;
+    document.getElementById("adminName").textContent = session.name || "Admin";
+
+    // Today's sales / orders (will populate once Sales module in Phase 4 writes real data)
+    const allSales = await DB.getAll("sales");
+    const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+    const todays = allSales.filter(s => s.date >= startOfDay.getTime());
+    const total = todays.reduce((sum, s) => sum + (s.total || 0), 0);
+    document.getElementById("todaySales").textContent = "₹" + total.toLocaleString("en-IN");
+    document.getElementById("todayOrders").textContent = todays.length;
+
+    // Stock value / product count (Phase 2 Product Master will populate products)
+    const products = await DB.getAll("products");
+    const stockVal = products.reduce((sum, p) => sum + ((p.stock || 0) * (p.sellingPrice || 0)), 0);
+    document.getElementById("stockValue").textContent = "₹" + stockVal.toLocaleString("en-IN");
+    document.getElementById("productCountHint").textContent = products.length + " products";
+    const lowStockCount = products.filter(p => (p.stock || 0) <= (p.reorderLevel || 0)).length;
+    document.getElementById("lowStock").textContent = lowStockCount;
+
+    // Pending sync
+    const queue = await DB.getAll("sync_queue");
+    document.getElementById("pendingSync").textContent = queue.filter(q => q.status !== "done").length;
+    startAutoSync();
+
+    // Internet status
+    function updateOnlineStatus() {
+      const pill = document.getElementById("internetPill");
+      if (navigator.onLine) {
+        pill.className = "pill ok";
+        pill.innerHTML = '<span class="dot"></span> Internet: Online';
+      } else {
+        pill.className = "pill bad";
+        pill.innerHTML = '<span class="dot"></span> Internet: Offline';
+      }
+    }
+    updateOnlineStatus();
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
+
+    // Stub nav links
+    document.querySelectorAll("[data-stub]").forEach(a => {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        alert(a.dataset.stub + " isn't built yet. It will appear here once that phase is complete.");
+      });
+    });
+  })();
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    if (confirm("Log out now?")) logout();
+  });
+</script>
+</body>
+</html>

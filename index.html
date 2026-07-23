@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>FoodERP Lite — Login</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="center-screen">
+
+  <!-- OPERATOR: PIN PAD (default screen — this is what your mother sees) -->
+  <div id="operatorPanel" class="login-card">
+    <div class="brand-mark">F</div>
+    <h1 id="brandName">FoodERP Lite</h1>
+    <p class="sub">Enter your 4-digit PIN</p>
+
+    <div class="pin-display" id="pinDisplay">
+      <span class="pin-dot"></span>
+      <span class="pin-dot"></span>
+      <span class="pin-dot"></span>
+      <span class="pin-dot"></span>
+    </div>
+
+    <div class="pin-error" id="pinError"></div>
+
+    <div class="pin-pad">
+      <button class="pin-key" data-key="1">1</button>
+      <button class="pin-key" data-key="2">2</button>
+      <button class="pin-key" data-key="3">3</button>
+      <button class="pin-key" data-key="4">4</button>
+      <button class="pin-key" data-key="5">5</button>
+      <button class="pin-key" data-key="6">6</button>
+      <button class="pin-key" data-key="7">7</button>
+      <button class="pin-key" data-key="8">8</button>
+      <button class="pin-key" data-key="9">9</button>
+      <button class="pin-key wide" data-key="clear">Clear</button>
+      <button class="pin-key" data-key="0">0</button>
+      <button class="pin-key wide" data-key="back">⌫</button>
+    </div>
+
+    <div class="mode-switch">
+      <a href="#" id="showAdminLink">Admin login</a>
+    </div>
+  </div>
+
+  <!-- ADMIN: username + password -->
+  <div id="adminPanel" class="admin-form-card" style="display:none;">
+    <h1>Admin Login</h1>
+    <p class="sub">Full access — products, reports, settings, sync</p>
+
+    <div class="form-error" id="adminError"></div>
+
+    <form id="adminForm">
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" autocomplete="username" required />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="btn btn-primary">Log In</button>
+    </form>
+
+    <div class="mode-switch">
+      <a href="#" id="showOperatorLink">← Back to PIN login</a>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/db.js"></script>
+<script src="js/branding.js"></script>
+<script src="js/auth.js"></script>
+<script>
+  const operatorPanel = document.getElementById("operatorPanel");
+  const adminPanel = document.getElementById("adminPanel");
+  const pinDisplay = document.getElementById("pinDisplay");
+  const pinError = document.getElementById("pinError");
+  const adminError = document.getElementById("adminError");
+
+  let pin = "";
+
+  function renderPin() {
+    const dots = pinDisplay.querySelectorAll(".pin-dot");
+    dots.forEach((dot, i) => dot.classList.toggle("filled", i < pin.length));
+  }
+
+  async function tryOperatorLogin() {
+    try {
+      await loginOperator(pin);
+      window.location.href = "pages/operator-home.html";
+    } catch (err) {
+      pinError.textContent = err.message;
+      pin = "";
+      renderPin();
+      setTimeout(() => (pinError.textContent = ""), 2500);
+    }
+  }
+
+  document.querySelectorAll(".pin-key").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.key;
+      if (key === "clear") {
+        pin = "";
+      } else if (key === "back") {
+        pin = pin.slice(0, -1);
+      } else if (pin.length < 4) {
+        pin += key;
+      }
+      renderPin();
+      if (pin.length === 4) tryOperatorLogin();
+    });
+  });
+
+  document.getElementById("showAdminLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    operatorPanel.style.display = "none";
+    adminPanel.style.display = "block";
+  });
+
+  document.getElementById("showOperatorLink").addEventListener("click", (e) => {
+    e.preventDefault();
+    adminPanel.style.display = "none";
+    operatorPanel.style.display = "block";
+    pin = "";
+    renderPin();
+  });
+
+  document.getElementById("adminForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value;
+    try {
+      await loginAdmin(username, password);
+      window.location.href = "pages/dashboard.html";
+    } catch (err) {
+      adminError.textContent = err.message;
+    }
+  });
+
+  // Init DB (creates schema + seeds default admin/operator on first run)
+  (async () => {
+    await initDB();
+    await applyBranding();
+    // If already logged in, skip straight to the right home screen.
+    const session = getSession();
+    if (session) {
+      window.location.href = session.type === "admin" ? "pages/dashboard.html" : "pages/operator-home.html";
+    }
+  })();
+
+  // Register service worker for offline use
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("service-worker.js").catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>

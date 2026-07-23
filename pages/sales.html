@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FoodERP Lite — Sales</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="mark">F</div><div class="name" id="brandName">FoodERP Lite</div></div>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <div class="section-label">Masters</div>
+      <a href="products.html">Products</a>
+      <a href="categories.html">Categories</a>
+      <a href="customers.html">Customers</a>
+      <a href="suppliers.html">Suppliers</a>
+      <div class="section-label">Operations</div>
+      <a href="purchase.html">Purchase</a>
+      <a href="production.html">Production</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="sales.html" class="active">Sales</a>
+      <div class="section-label">Tools</div>
+      <a href="reports.html">Reports</a>
+      <a href="sync.html">Sync</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="logout-btn" id="logoutBtn">Log Out</button>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div><h1>Sales</h1><div class="greeting">Every invoice raised from the Billing screen</div></div>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" class="search-input" id="searchBox" placeholder="Search by invoice no. or customer..." />
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Invoice</th><th>Date</th><th>Customer</th><th>Payment</th><th>Operator</th><th>Total</th><th></th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="empty-note" id="emptyNote" style="display:none;">
+        <div class="icon-circle">🧾</div>
+        <h3>No sales yet</h3>
+        <p>Sales made from the operator Billing screen will show up here.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" style="display:none;">
+  <div class="modal-card" style="max-width:420px;">
+    <h2>Invoice Detail</h2>
+    <div class="receipt" id="receiptContent" style="margin-top:10px;"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="closeBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script>
+  let allSales = [];
+  let allSaleItems = [];
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str ?? "";
+    return div.innerHTML;
+  }
+  function money(n) { return "₹" + Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  async function loadSales() {
+    allSales = (await DB.getAll("sales")).sort((a, b) => b.date - a.date);
+    allSaleItems = await DB.getAll("sale_items");
+    renderTable(allSales);
+  }
+
+  function renderTable(list) {
+    const body = document.getElementById("tableBody");
+    const empty = document.getElementById("emptyNote");
+    body.innerHTML = "";
+    if (list.length === 0) { empty.style.display = "block"; return; }
+    empty.style.display = "none";
+    list.forEach((s) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><strong>${escapeHtml(s.invoiceNo)}</strong></td>
+        <td>${new Date(s.date).toLocaleString("en-IN")}</td>
+        <td>${escapeHtml(s.customerName)}</td>
+        <td><span class="badge neutral">${escapeHtml(s.payment)}</span></td>
+        <td>${escapeHtml(s.operatorName || "—")}</td>
+        <td><strong>${money(s.total)}</strong></td>
+        <td><button class="icon-btn" data-view="${s.id}" title="View">👁️</button></td>`;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll("[data-view]").forEach((btn) =>
+      btn.addEventListener("click", () => viewReceipt(Number(btn.dataset.view))));
+  }
+
+  function viewReceipt(saleId) {
+    const sale = allSales.find((s) => s.id === saleId);
+    if (!sale) return;
+    const items = allSaleItems.filter((i) => i.saleId === saleId);
+    const lines = items.map((i) =>
+      `<div class="r-row"><span>${escapeHtml(i.name)} x${i.qty}</span><span>${money(i.price * i.qty)}</span></div>`
+    ).join("");
+
+    document.getElementById("receiptContent").innerHTML = `
+      <div class="r-center" style="font-size:0.8rem;">Invoice: ${escapeHtml(sale.invoiceNo)}</div>
+      <div class="r-center" style="font-size:0.8rem;">${new Date(sale.date).toLocaleString("en-IN")}</div>
+      <hr>
+      <div style="font-size:0.85rem;">Customer: ${escapeHtml(sale.customerName)}</div>
+      <div style="font-size:0.85rem;">Operator: ${escapeHtml(sale.operatorName || "—")}</div>
+      <hr>
+      ${lines}
+      <hr>
+      <div class="r-row"><span>Subtotal</span><span>${money(sale.subtotal)}</span></div>
+      <div class="r-row"><span>GST</span><span>${money(sale.gst)}</span></div>
+      <div class="r-row"><span>Discount</span><span>−${money(sale.discount)}</span></div>
+      <div class="r-row total"><span>TOTAL</span><span>${money(sale.total)}</span></div>
+      <hr>
+      <div class="r-row"><span>Payment</span><span>${escapeHtml(sale.payment)}</span></div>
+    `;
+    document.getElementById("modalOverlay").style.display = "flex";
+  }
+
+  document.getElementById("closeBtn").addEventListener("click", () => {
+    document.getElementById("modalOverlay").style.display = "none";
+  });
+  document.getElementById("modalOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "modalOverlay") document.getElementById("modalOverlay").style.display = "none";
+  });
+
+  document.getElementById("searchBox").addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase();
+    renderTable(allSales.filter((s) =>
+      (s.invoiceNo || "").toLowerCase().includes(q) || (s.customerName || "").toLowerCase().includes(q)));
+  });
+
+  document.querySelectorAll("[data-stub]").forEach(a => {
+    a.addEventListener("click", (e) => { e.preventDefault(); alert(a.dataset.stub + " isn't built yet."); });
+  });
+  document.getElementById("logoutBtn").addEventListener("click", () => { if (confirm("Log out now?")) logout(); });
+
+  (async () => {
+    await initDB();
+    await applyBranding();
+    const session = requireSession(["admin"]);
+    if (!session) return;
+    await loadSales();
+  })();
+</script>
+</body>
+</html>

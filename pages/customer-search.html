@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>FoodERP Lite — Find Customer</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="operator-shell">
+  <div class="operator-topbar">
+    <div class="who">🔍 Find Customer</div>
+    <a class="exit-btn" href="operator-home.html" style="text-decoration:none;">← Back</a>
+  </div>
+
+  <div style="padding:20px 20px 0;">
+    <input type="text" id="searchBox" class="search-input" style="max-width:none; font-size:1.2rem; padding:16px 18px;"
+      placeholder="Type name or phone number..." autofocus />
+  </div>
+
+  <div style="padding:20px;">
+    <div id="results"></div>
+    <div class="empty-note section-card" id="emptyNote">
+      <div class="icon-circle">🧑‍🤝‍🧑</div>
+      <h3 id="emptyTitle">No customers added yet</h3>
+      <p>Ask the shop owner to add customers from the Admin screen.</p>
+    </div>
+  </div>
+</div>
+
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script>
+  let allCustomers = [];
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str ?? "";
+    return div.innerHTML;
+  }
+
+  function render(list) {
+    const results = document.getElementById("results");
+    const empty = document.getElementById("emptyNote");
+    results.innerHTML = "";
+
+    if (allCustomers.length === 0) {
+      empty.style.display = "block";
+      document.getElementById("emptyTitle").textContent = "No customers added yet";
+      return;
+    }
+    if (list.length === 0) {
+      empty.style.display = "block";
+      document.getElementById("emptyTitle").textContent = "No match found";
+      return;
+    }
+    empty.style.display = "none";
+
+    list.forEach((c) => {
+      const card = document.createElement("div");
+      card.className = "section-card";
+      card.style.marginBottom = "14px";
+      card.style.display = "flex";
+      card.style.justifyContent = "space-between";
+      card.style.alignItems = "center";
+      card.style.flexWrap = "wrap";
+      card.style.gap = "10px";
+      card.innerHTML = `
+        <div>
+          <div style="font-size:1.2rem; font-weight:800;">${escapeHtml(c.name)}</div>
+          <div style="color:var(--color-text-muted); font-size:1rem;">${escapeHtml(c.phone || "No phone number")}</div>
+        </div>
+        <span class="badge neutral" style="font-size:0.9rem; padding:8px 14px;">${escapeHtml(c.type || "Retail")}</span>
+      `;
+      results.appendChild(card);
+    });
+  }
+
+  document.getElementById("searchBox").addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    if (!q) { render(allCustomers); return; }
+    render(allCustomers.filter((c) =>
+      (c.name || "").toLowerCase().includes(q) || (c.phone || "").includes(q)));
+  });
+
+  (async () => {
+    await initDB();
+    await applyBranding();
+    const session = requireSession(["operator", "admin"]);
+    if (!session) return;
+    allCustomers = await DB.getAll("customers");
+    render(allCustomers);
+  })();
+</script>
+</body>
+</html>

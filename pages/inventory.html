@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FoodERP Lite — Inventory</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="mark">F</div><div class="name" id="brandName">FoodERP Lite</div></div>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <div class="section-label">Masters</div>
+      <a href="products.html">Products</a>
+      <a href="categories.html">Categories</a>
+      <a href="customers.html">Customers</a>
+      <a href="suppliers.html">Suppliers</a>
+      <div class="section-label">Operations</div>
+      <a href="purchase.html">Purchase</a>
+      <a href="production.html">Production</a>
+      <a href="inventory.html" class="active">Inventory</a>
+      <a href="sales.html">Sales</a>
+      <div class="section-label">Tools</div>
+      <a href="reports.html">Reports</a>
+      <a href="sync.html">Sync</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="logout-btn" id="logoutBtn">Log Out</button>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div><h1>Inventory</h1><div class="greeting">Current stock and every stock movement, in one place</div></div>
+      <button class="btn-add" id="newBtn">+ Stock Adjustment</button>
+    </div>
+
+    <div class="type-tabs">
+      <button class="type-tab active" data-tab="stock">Current Stock</button>
+      <button class="type-tab" data-tab="log">Movement Log</button>
+    </div>
+
+    <div id="stockTab">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Product</th><th>Category</th><th>Current Stock</th><th>Reorder Level</th><th>Status</th></tr></thead>
+          <tbody id="stockBody"></tbody>
+        </table>
+        <div class="empty-note" id="stockEmpty" style="display:none;">
+          <div class="icon-circle">📦</div>
+          <h3>No products yet</h3>
+          <p>Add products first — their stock will appear here.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="logTab" style="display:none;">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Product</th><th>Type</th><th>Qty Change</th><th>Note</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+        <div class="empty-note" id="logEmpty" style="display:none;">
+          <div class="icon-circle">📜</div>
+          <h3>No stock movements yet</h3>
+          <p>Purchases, production, and adjustments will show up here.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" style="display:none;">
+  <div class="modal-card">
+    <h2>Stock Adjustment</h2>
+    <div class="modal-sub">For anything that isn't a purchase or a production batch — damage, returns, corrections</div>
+    <form id="adjustForm">
+      <div class="field">
+        <label for="product">Product</label>
+        <select id="product" required></select>
+      </div>
+      <div class="field">
+        <label for="type">Movement Type</label>
+        <select id="type">
+          <option value="in">Stock In (add)</option>
+          <option value="out">Stock Out (remove)</option>
+          <option value="damage">Damage (remove)</option>
+          <option value="return">Customer Return (add back)</option>
+          <option value="adjustment_plus">Correction — Add</option>
+          <option value="adjustment_minus">Correction — Subtract</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="quantity">Quantity</label>
+        <input type="number" id="quantity" min="0.01" step="0.01" required />
+      </div>
+      <div class="field">
+        <label for="note">Reason / Note</label>
+        <input type="text" id="note" placeholder="e.g. Bag torn during handling" />
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script>
+  let allProducts = [];
+  let allInventory = [];
+
+  const TYPE_META = {
+    purchase:          { label: "Purchase",           sign: 1  },
+    production:        { label: "Production",         sign: 1  },
+    sale:              { label: "Sale",                sign: -1 },
+    in:                { label: "Stock In",           sign: 1  },
+    out:               { label: "Stock Out",          sign: -1 },
+    damage:            { label: "Damage",             sign: -1 },
+    return:            { label: "Customer Return",    sign: 1  },
+    adjustment_plus:   { label: "Correction (Add)",   sign: 1  },
+    adjustment_minus:  { label: "Correction (Subtract)", sign: -1 },
+  };
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str ?? "";
+    return div.innerHTML;
+  }
+
+  async function loadAll() {
+    allProducts = await DB.getAll("products");
+    allInventory = await DB.getAll("inventory");
+    renderStock();
+    renderLog();
+  }
+
+  function renderStock() {
+    const body = document.getElementById("stockBody");
+    const empty = document.getElementById("stockEmpty");
+    body.innerHTML = "";
+    if (allProducts.length === 0) { empty.style.display = "block"; return; }
+    empty.style.display = "none";
+    allProducts.forEach((p) => {
+      const low = (p.stock || 0) <= (p.reorderLevel || 0);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><strong>${escapeHtml(p.name)}</strong></td>
+        <td>${escapeHtml(p.category || "—")}</td>
+        <td>${p.stock ?? 0} ${escapeHtml(p.unit || "")}</td>
+        <td>${p.reorderLevel ?? 0} ${escapeHtml(p.unit || "")}</td>
+        <td><span class="badge ${low ? "inactive" : "active"}">${low ? "Low Stock" : "OK"}</span></td>`;
+      body.appendChild(tr);
+    });
+  }
+
+  function renderLog() {
+    const body = document.getElementById("logBody");
+    const empty = document.getElementById("logEmpty");
+    body.innerHTML = "";
+    const sorted = [...allInventory].sort((a, b) => b.date - a.date).slice(0, 100);
+    if (sorted.length === 0) { empty.style.display = "block"; return; }
+    empty.style.display = "none";
+    sorted.forEach((entry) => {
+      const product = allProducts.find((p) => p.id === entry.productId);
+      const meta = TYPE_META[entry.type] || { label: entry.type, sign: 1 };
+      const signedQty = (meta.sign * Math.abs(entry.qty)).toFixed(2);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${new Date(entry.date).toLocaleString("en-IN")}</td>
+        <td>${escapeHtml(product ? product.name : "Unknown")}</td>
+        <td><span class="badge neutral">${meta.label}</span></td>
+        <td style="color:${meta.sign > 0 ? "var(--color-success)" : "var(--color-danger)"}; font-weight:700;">
+          ${meta.sign > 0 ? "+" : ""}${signedQty}
+        </td>
+        <td>${escapeHtml(entry.note || "—")}</td>`;
+      body.appendChild(tr);
+    });
+  }
+
+  function populateProductSelect() {
+    document.getElementById("product").innerHTML = allProducts.length
+      ? allProducts.map((p) => `<option value="${p.id}">${escapeHtml(p.name)} — current: ${p.stock ?? 0} ${escapeHtml(p.unit || "")}</option>`).join("")
+      : `<option value="">No products yet</option>`;
+  }
+
+  document.querySelectorAll(".type-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".type-tab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      const showStock = tab.dataset.tab === "stock";
+      document.getElementById("stockTab").style.display = showStock ? "block" : "none";
+      document.getElementById("logTab").style.display = showStock ? "none" : "block";
+    });
+  });
+
+  function openModal() {
+    document.getElementById("adjustForm").reset();
+    populateProductSelect();
+    document.getElementById("modalOverlay").style.display = "flex";
+  }
+  function closeModal() { document.getElementById("modalOverlay").style.display = "none"; }
+
+  document.getElementById("newBtn").addEventListener("click", () => {
+    if (allProducts.length === 0) { alert("Add a product first (Products page)."); return; }
+    openModal();
+  });
+  document.getElementById("cancelBtn").addEventListener("click", closeModal);
+  document.getElementById("modalOverlay").addEventListener("click", (e) => { if (e.target.id === "modalOverlay") closeModal(); });
+
+  document.getElementById("adjustForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const productId = Number(document.getElementById("product").value);
+    const type = document.getElementById("type").value;
+    const quantity = Number(document.getElementById("quantity").value || 0);
+    const note = document.getElementById("note").value.trim();
+    if (!productId || quantity <= 0) { alert("Pick a product and enter a quantity greater than zero."); return; }
+
+    const meta = TYPE_META[type];
+    const product = allProducts.find((p) => p.id === productId);
+    if (!product) return;
+
+    const newStock = (product.stock || 0) + meta.sign * quantity;
+    if (newStock < 0) { alert("This would make stock negative. Check the quantity."); return; }
+
+    await DB.put("products", { ...product, stock: newStock });
+    await DB.add("inventory", {
+      productId, type, qty: quantity, date: Date.now(),
+      refType: "manual", refId: null, note,
+    });
+
+    closeModal();
+    await loadAll();
+  });
+
+  document.querySelectorAll("[data-stub]").forEach(a => {
+    a.addEventListener("click", (e) => { e.preventDefault(); alert(a.dataset.stub + " isn't built yet."); });
+  });
+  document.getElementById("logoutBtn").addEventListener("click", () => { if (confirm("Log out now?")) logout(); });
+
+  (async () => {
+    await initDB();
+    await applyBranding();
+    const session = requireSession(["admin"]);
+    if (!session) return;
+    await loadAll();
+  })();
+</script>
+</body>
+</html>

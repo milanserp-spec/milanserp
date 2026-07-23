@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>FoodERP Lite — Add Stock</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="operator-shell">
+  <div class="operator-topbar">
+    <div class="who">📦 Add Stock</div>
+    <a class="exit-btn" href="operator-home.html" style="text-decoration:none;">← Back</a>
+  </div>
+
+  <div style="padding:24px; max-width:480px; margin:0 auto; width:100%;">
+    <div class="section-card" id="formCard">
+      <div class="field">
+        <label for="product" style="font-size:var(--fs-sm);">Which product came in?</label>
+        <div style="display:flex; gap:10px;">
+          <select id="product" style="flex:1; padding:16px; font-size:var(--fs-md); border:2px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-bg);"></select>
+          <button id="scanBtn" type="button" style="width:56px; flex-shrink:0; border:none; border-radius:var(--radius-sm); background:var(--color-primary); color:#fff; font-size:1.3rem;">📷</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="quantity" style="font-size:var(--fs-sm);">How much?</label>
+        <input type="number" id="quantity" min="0.01" step="0.01" placeholder="Enter quantity"
+          style="width:100%; padding:16px; font-size:1.4rem; text-align:center; border:2px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-bg);" />
+      </div>
+      <button class="btn btn-accent" id="saveBtn" style="font-size:1.2rem; padding:18px;">✓ Add to Stock</button>
+    </div>
+
+    <div class="empty-note section-card" id="noProductsNote" style="display:none;">
+      <div class="icon-circle">📦</div>
+      <h3>No products set up yet</h3>
+      <p>Ask the shop owner to add products from the Admin screen first.</p>
+    </div>
+
+    <div class="section-card" id="successNote" style="display:none; text-align:center;">
+      <div class="icon-circle" style="margin:0 auto 12px; background:var(--color-success-tint);">✅</div>
+      <h3 id="successText">Stock added</h3>
+      <button class="btn btn-primary" id="addAnotherBtn" style="margin-top:10px;">Add Another</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/scanner.js"></script>
+<script>
+  let allProducts = [];
+  let session = null;
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str ?? "";
+    return div.innerHTML;
+  }
+
+  function populateSelect() {
+    const select = document.getElementById("product");
+    select.innerHTML = allProducts.map((p) =>
+      `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+  }
+
+  document.getElementById("scanBtn").addEventListener("click", async () => {
+    try {
+      const code = await openScanner();
+      if (!code) return;
+      const product = allProducts.find((p) => p.barcode && p.barcode === code);
+      if (product) {
+        document.getElementById("product").value = product.id;
+        document.getElementById("quantity").focus();
+      } else {
+        alert("No product matches that barcode. Pick it from the list instead.");
+      }
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  document.getElementById("saveBtn").addEventListener("click", async () => {
+    const productId = Number(document.getElementById("product").value);
+    const quantity = Number(document.getElementById("quantity").value || 0);
+    if (!productId || quantity <= 0) {
+      alert("Please choose a product and enter how much came in.");
+      return;
+    }
+    const product = allProducts.find((p) => p.id === productId);
+    if (!product) return;
+
+    await DB.put("products", { ...product, stock: (product.stock || 0) + quantity });
+    await DB.add("inventory", {
+      productId, type: "in", qty: quantity, date: Date.now(),
+      refType: "operator", refId: session ? session.id : null,
+      note: "Added by " + (session ? session.name : "operator") + " (quick stock entry)",
+    });
+
+    document.getElementById("formCard").style.display = "none";
+    document.getElementById("successText").textContent =
+      `Added ${quantity} ${product.unit || ""} of ${product.name}`;
+    document.getElementById("successNote").style.display = "block";
+  });
+
+  document.getElementById("addAnotherBtn").addEventListener("click", () => {
+    document.getElementById("quantity").value = "";
+    document.getElementById("successNote").style.display = "none";
+    document.getElementById("formCard").style.display = "block";
+  });
+
+  (async () => {
+    await initDB();
+    await applyBranding();
+    session = requireSession(["operator", "admin"]);
+    if (!session) return;
+    allProducts = await DB.getAll("products");
+    if (allProducts.length === 0) {
+      document.getElementById("formCard").style.display = "none";
+      document.getElementById("noProductsNote").style.display = "block";
+      return;
+    }
+    populateSelect();
+  })();
+</script>
+</body>
+</html>

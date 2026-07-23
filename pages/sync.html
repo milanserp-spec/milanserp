@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FoodERP Lite — Sync</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="mark">F</div><div class="name" id="brandName">FoodERP Lite</div></div>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <div class="section-label">Masters</div>
+      <a href="products.html">Products</a>
+      <a href="categories.html">Categories</a>
+      <a href="customers.html">Customers</a>
+      <a href="suppliers.html">Suppliers</a>
+      <div class="section-label">Operations</div>
+      <a href="purchase.html">Purchase</a>
+      <a href="production.html">Production</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="sales.html">Sales</a>
+      <div class="section-label">Tools</div>
+      <a href="reports.html">Reports</a>
+      <a href="sync.html" class="active">Sync</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="logout-btn" id="logoutBtn">Log Out</button>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div><h1>Google Sheets Sync</h1><div class="greeting">Two-way sync — push your changes up, pull down what changed on other devices</div></div>
+    </div>
+
+    <div class="section-card" style="background:var(--color-primary-tint); border-color:var(--color-primary);">
+      <p style="font-size:0.88rem; color:var(--color-primary-dark); margin:0;">
+        ℹ️ This isn't instant — changes reach other devices when each one syncs (automatically every
+        ~60 seconds while online, or right away with "Sync Now"). If the same record is edited on two
+        devices before either syncs, whichever syncs last wins. For stock counts especially, try to
+        sync often and avoid billing the same item on two devices at once.
+      </p>
+    </div>
+
+    <div class="card-grid" style="margin-bottom:20px;">
+      <div class="stat-card"><div class="label">Pending</div><div class="value" id="statPending">0</div></div>
+      <div class="stat-card"><div class="label">Synced</div><div class="value" id="statDone">0</div></div>
+      <div class="stat-card"><div class="label">Failed</div><div class="value danger" id="statFailed">0</div></div>
+    </div>
+
+    <div class="section-card">
+      <h2 style="font-size:1.1rem;">1. Connect your Supabase Project</h2>
+      <p style="color:var(--color-text-muted); font-size:0.9rem; margin-bottom:14px;">
+        Supabase is a free hosted database — set it up once (a SQL script + two values to paste in),
+        no redeploying needed afterward, unlike the earlier Google Sheets version.
+      </p>
+
+      <div class="field">
+        <label for="supabaseUrl">Supabase Project URL</label>
+        <input type="text" id="supabaseUrl" placeholder="https://xxxxx.supabase.co" />
+      </div>
+      <div class="field">
+        <label for="supabaseKey">Supabase Publishable / Anon Key</label>
+        <input type="text" id="supabaseKey" placeholder="sb_publishable_... or eyJ..." />
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-primary" id="saveUrlBtn" style="width:auto; padding:12px 20px;">Save</button>
+        <button class="btn btn-ghost" id="testBtn" style="width:auto; padding:12px 20px;">Test Connection</button>
+      </div>
+      <div class="form-error" id="connStatus" style="margin-top:10px;"></div>
+
+      <label style="display:flex; align-items:center; gap:10px; margin-top:16px; font-size:var(--fs-sm); font-weight:600;">
+        <input type="checkbox" id="autoSyncToggle" style="width:18px; height:18px;" />
+        Sync automatically in the background whenever there's internet
+      </label>
+    </div>
+
+    <div class="section-card">
+      <h2 style="font-size:1.1rem;">2. Sync now</h2>
+      <p style="color:var(--color-text-muted); font-size:0.9rem; margin-bottom:14px;">
+        Pushes every pending change — new products, sales, purchases, production batches — to your Sheet.
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <button class="btn btn-accent" id="syncNowBtn" style="width:auto; padding:12px 24px;">⟳ Sync Now</button>
+        <button class="btn btn-ghost" id="retryFailedBtn" style="width:auto; padding:12px 20px;">Retry Failed</button>
+        <span id="syncProgress" style="font-size:var(--fs-sm); color:var(--color-text-muted);"></span>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <h2 style="font-size:1.1rem;">Recent Activity</h2>
+      <div class="table-wrap" style="box-shadow:none; margin-top:10px;">
+        <table class="data-table">
+          <thead><tr><th>Table</th><th>Status</th><th>Attempts</th><th>Last Update</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <h2 style="font-size:1.1rem;">Setup Steps</h2>
+      <ol class="step-list">
+        <li>Go to <strong>supabase.com</strong> → sign up (free) → <strong>New Project</strong>.</li>
+        <li>Once it's created, go to <strong>Project Settings → API</strong>. Copy the <strong>Project URL</strong> and the <strong>anon / publishable key</strong>.</li>
+        <li>Paste both into the fields above → <strong>Save</strong> → <strong>Test Connection</strong>.</li>
+        <li>In Supabase, go to the <strong>SQL Editor</strong> → New query → paste in the schema below → <strong>Run</strong>. This creates the tables, once, ever.</li>
+        <li>Tap <strong>Test Connection</strong> again to confirm the tables exist, then <strong>Sync Now</strong>.</li>
+        <li>Repeat step 3 (paste URL + key, test) on every other device — the SQL setup only needs doing once, in Supabase itself.</li>
+      </ol>
+      <p style="color:var(--color-text-muted); font-size:0.85rem; margin:14px 0;">
+        ⚠️ Treat the Project URL + key like a password — anyone who has both can read and write this data.
+        Row Level Security is left off on purpose to keep setup simple; that's the tradeoff.
+      </p>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <strong style="font-size:var(--fs-sm);">Schema SQL (run once in Supabase → SQL Editor)</strong>
+        <button class="btn-add" id="copyScriptBtn" style="padding:8px 14px;">Copy</button>
+      </div>
+      <div class="code-block" id="scriptCode">Loading…</div>
+    </div>
+  </main>
+</div>
+
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/sync.js"></script>
+<script>
+  async function refreshStats() {
+    const queue = await DB.getAll("sync_queue");
+    document.getElementById("statPending").textContent = queue.filter((q) => q.status === "pending" || q.status === "error").length;
+    document.getElementById("statDone").textContent = queue.filter((q) => q.status === "done").length;
+    document.getElementById("statFailed").textContent = queue.filter((q) => q.status === "failed").length;
+
+    const recent = [...queue].sort((a, b) => (b.syncedAt || b.createdAt) - (a.syncedAt || a.createdAt)).slice(0, 25);
+    document.getElementById("logBody").innerHTML = recent.length
+      ? recent.map((q) => `
+          <tr>
+            <td>${q.table} #${q.recordId}</td>
+            <td><span class="badge ${q.status === "done" ? "active" : q.status === "failed" ? "inactive" : "neutral"}">${q.status}</span></td>
+            <td>${q.retryCount || 0}</td>
+            <td>${new Date(q.syncedAt || q.createdAt).toLocaleString("en-IN")}</td>
+          </tr>`).join("")
+      : `<tr><td colspan="4" style="text-align:center; color:var(--color-text-muted); padding:20px;">Nothing queued yet — make a sale or add a product to see activity here.</td></tr>`;
+  }
+
+  document.getElementById("saveUrlBtn").addEventListener("click", async () => {
+    await setSupabaseConfig(document.getElementById("supabaseUrl").value.trim(), document.getElementById("supabaseKey").value.trim());
+    document.getElementById("connStatus").style.color = "var(--color-success)";
+    document.getElementById("connStatus").textContent = "Saved.";
+  });
+
+  document.getElementById("testBtn").addEventListener("click", async () => {
+    const url = document.getElementById("supabaseUrl").value.trim();
+    const key = document.getElementById("supabaseKey").value.trim();
+    const statusEl = document.getElementById("connStatus");
+    if (!url || !key) { statusEl.style.color = "var(--color-danger)"; statusEl.textContent = "Paste both the Project URL and the key first."; return; }
+    statusEl.style.color = "var(--color-text-muted)";
+    statusEl.textContent = "Testing…";
+    try {
+      await testSyncConnection(url, key);
+      statusEl.style.color = "var(--color-success)";
+      statusEl.textContent = "✅ Connected! Tables found and reachable.";
+    } catch (err) {
+      statusEl.style.color = "var(--color-danger)";
+      statusEl.textContent = "❌ " + err.message;
+    }
+  });
+
+  document.getElementById("autoSyncToggle").addEventListener("change", async (e) => {
+    await setAutoSyncEnabled(e.target.checked);
+    if (e.target.checked) startAutoSync();
+  });
+
+  document.getElementById("syncNowBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("syncNowBtn");
+    const progress = document.getElementById("syncProgress");
+    btn.disabled = true;
+    progress.textContent = "Pushing your changes…";
+    try {
+      const result = await runFullSync((p) => {
+        if (p.phase === "push" && p.total) progress.textContent = `Pushing ${p.done}/${p.total}…`;
+        else if (p.phase === "pull") progress.textContent = `Pulling latest for "${p.table}"…`;
+      });
+      progress.textContent =
+        `Pushed: ${result.push.succeeded} ok, ${result.push.failed} failed. ` +
+        `Pulled: ${result.pull.created} new, ${result.pull.updated} updated.`;
+    } catch (err) {
+      progress.textContent = "❌ " + err.message;
+    }
+    btn.disabled = false;
+    await refreshStats();
+  });
+
+  document.getElementById("retryFailedBtn").addEventListener("click", async () => {
+    const queue = await DB.getAll("sync_queue");
+    const failed = queue.filter((q) => q.status === "failed");
+    for (const q of failed) {
+      await DB.put("sync_queue", { ...q, status: "pending", retryCount: 0 });
+    }
+    await refreshStats();
+    alert(`${failed.length} failed record(s) queued for another try. Tap "Sync Now" to push them.`);
+  });
+
+  document.getElementById("copyScriptBtn").addEventListener("click", async () => {
+    const text = document.getElementById("scriptCode").textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      document.getElementById("copyScriptBtn").textContent = "Copied!";
+      setTimeout(() => (document.getElementById("copyScriptBtn").textContent = "Copy"), 1500);
+    } catch (e) {
+      alert("Couldn't copy automatically — select the text and copy manually.");
+    }
+  });
+
+  document.querySelectorAll("[data-stub]").forEach(a => {
+    a.addEventListener("click", (e) => { e.preventDefault(); alert(a.dataset.stub + " isn't built yet."); });
+  });
+  document.getElementById("logoutBtn").addEventListener("click", () => { if (confirm("Log out now?")) logout(); });
+
+  (async () => {
+    await initDB();
+    await applyBranding();
+    const session = requireSession(["admin"]);
+    if (!session) return;
+
+    const settings = await getSyncSettings();
+    document.getElementById("supabaseUrl").value = settings.url;
+    document.getElementById("supabaseKey").value = settings.key;
+    document.getElementById("autoSyncToggle").checked = !!settings.autoEnabled;
+
+    try {
+      const res = await fetch("../sync/schema.sql");
+      document.getElementById("scriptCode").textContent = await res.text();
+    } catch (e) {
+      document.getElementById("scriptCode").textContent = "Couldn't load the file — it's in your project folder at sync/schema.sql";
+    }
+
+    await refreshStats();
+    if (settings.autoEnabled) startAutoSync();
+  })();
+</script>
+</body>
+</html>

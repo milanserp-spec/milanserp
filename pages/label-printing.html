@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>FoodERP Lite — Print Label</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+<div class="operator-shell">
+  <div class="operator-topbar">
+    <div class="who">🏷️ Print Label</div>
+    <a class="exit-btn" href="operator-home.html" style="text-decoration:none;">← Back</a>
+  </div>
+
+  <div style="padding:20px; max-width:480px; margin:0 auto; width:100%;">
+
+    <div class="printer-status" id="printerStatus">
+      <span class="ps-label" id="printerStatusText">🔌 Checking printer...</span>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-add" id="testBtn" style="padding:9px 16px; background:var(--color-border); color:var(--color-text);">Test</button>
+        <button class="btn-add" id="connectBtn" style="padding:9px 16px;">Connect</button>
+      </div>
+    </div>
+
+    <div class="section-card" id="noProductsNote" style="display:none; text-align:center;">
+      <div class="icon-circle" style="margin:0 auto 10px;">🏷️</div>
+      <h3>No products yet</h3>
+      <p>Ask the shop owner to add products from the Admin screen first.</p>
+    </div>
+
+    <div id="formArea">
+
+      <div class="field">
+        <label for="product">Product</label>
+        <select id="product" style="width:100%; padding:14px; font-size:var(--fs-md); border:2px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-bg);"></select>
+      </div>
+
+      <!-- ===== Customize which fields print ===== -->
+      <div class="section-card" style="margin-top:16px;">
+        <h2 style="font-size:1rem; margin-bottom:2px;">Label Fields</h2>
+        <p style="color:var(--color-text-muted); font-size:0.85rem; margin-bottom:6px;">Turn off anything you don't want printed on this label</p>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Product Name</div></div>
+          <label class="switch"><input type="checkbox" id="fld-name" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Batch Number</div></div>
+          <label class="switch"><input type="checkbox" id="fld-batch" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">MRP</div></div>
+          <label class="switch"><input type="checkbox" id="fld-mrp" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Manufacturing Date</div></div>
+          <label class="switch"><input type="checkbox" id="fld-mfg" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Expiry Date</div></div>
+          <label class="switch"><input type="checkbox" id="fld-exp" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Barcode</div></div>
+          <label class="switch"><input type="checkbox" id="fld-barcode" checked><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">QR Code</div></div>
+          <label class="switch"><input type="checkbox" id="fld-qr" checked><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <!-- ===== Batch number builder ===== -->
+      <div class="section-card">
+        <div class="toggle-row" style="border-bottom:none; padding-top:0;">
+          <div>
+            <div class="toggle-label">Auto-Generate Batch Number</div>
+            <div class="toggle-hint">Product code + year + a serial number that increases each batch</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="autoBatchToggle" checked><span class="slider"></span></label>
+        </div>
+
+        <div id="autoBatchFields">
+          <div class="form-grid" style="margin-top:10px;">
+            <div class="field">
+              <label for="batchAbbrev">Code</label>
+              <input type="text" id="batchAbbrev" maxlength="6" placeholder="e.g. TUR" style="text-transform:uppercase;" />
+            </div>
+            <div class="field">
+              <label for="batchYear">Year</label>
+              <input type="text" id="batchYear" disabled />
+            </div>
+            <div class="field full">
+              <label for="batchSerial">Serial Number</label>
+              <input type="number" id="batchSerial" min="1" step="1" />
+              <div class="toggle-hint" id="serialHint" style="margin-top:4px;"></div>
+            </div>
+          </div>
+          <div class="batch-preview-box" id="batchPreview">—</div>
+        </div>
+
+        <div id="manualBatchField" style="display:none; margin-top:10px;">
+          <div class="field">
+            <label for="manualBatch">Batch Number</label>
+            <input type="text" id="manualBatch" placeholder="e.g. B-0042" />
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="mfgDate">Manufacturing Date</label>
+        <input type="date" id="mfgDate" />
+      </div>
+      <div class="field">
+        <label for="expiryDate">Expiry Date</label>
+        <input type="date" id="expiryDate" />
+      </div>
+
+      <div class="label-preview" id="labelPreview">
+        <div class="lp-name" id="lpName" style="display:none;">—</div>
+        <div class="lp-line" id="lpBatch" style="display:none;">Batch: —</div>
+        <div class="lp-line" id="lpMrp" style="display:none;">MRP: —</div>
+        <div class="lp-line" id="lpDates" style="display:none;">Mfg: — · Exp: —</div>
+        <canvas id="barcodeCanvas"></canvas>
+        <canvas id="qrCanvas" style="width:110px; height:110px;"></canvas>
+      </div>
+
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button class="btn btn-ghost" id="browserPrintBtn">🖨️ Print via Browser</button>
+        <button class="btn btn-accent" id="btPrintBtn">📶 Print to Bluetooth</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/vendor/jsbarcode.min.js"></script>
+<script src="../js/vendor/qrcode.min.js"></script>
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/barcode.js"></script>
+<script src="../js/printing.js"></script>
+<script>
+  let allProducts = [];
+  let serialCommitted = true; // becomes false once a fresh serial is "pending use"
+
+  function addDays(dateStr, days) {
+    const d = dateStr ? new Date(dateStr) : new Date();
+    d.setDate(d.getDate() + Number(days || 0));
+    return d.toISOString().slice(0, 10);
+  }
+
+  function abbrevFromName(name) {
+    const letters = (name || "").toUpperCase().replace(/[^A-Z]/g, "");
+    return letters.slice(0, 3) || "PRD";
+  }
+
+  function currentField() {
+    return {
+      name: document.getElementById("fld-name").checked,
+      batch: document.getElementById("fld-batch").checked,
+      mrp: document.getElementById("fld-mrp").checked,
+      mfg: document.getElementById("fld-mfg").checked,
+      exp: document.getElementById("fld-exp").checked,
+      barcode: document.getElementById("fld-barcode").checked,
+      qr: document.getElementById("fld-qr").checked,
+    };
+  }
+
+  async function saveFieldPrefs() {
+    await DB.put("settings", { key: "labelFields", value: currentField() });
+  }
+
+  async function loadFieldPrefs() {
+    const rec = await DB.get("settings", "labelFields");
+    if (!rec) return;
+    const f = rec.value;
+    document.getElementById("fld-name").checked = f.name !== false;
+    document.getElementById("fld-batch").checked = f.batch !== false;
+    document.getElementById("fld-mrp").checked = f.mrp !== false;
+    document.getElementById("fld-mfg").checked = f.mfg !== false;
+    document.getElementById("fld-exp").checked = f.exp !== false;
+    document.getElementById("fld-barcode").checked = f.barcode !== false;
+    document.getElementById("fld-qr").checked = f.qr !== false;
+  }
+
+  document.querySelectorAll('#formArea input[type="checkbox"][id^="fld-"]').forEach((cb) => {
+    cb.addEventListener("change", async () => { await saveFieldPrefs(); await updatePreview(); });
+  });
+
+  function populateProducts() {
+    const select = document.getElementById("product");
+    select.innerHTML = allProducts.map((p) =>
+      `<option value="${p.id}">${p.name}</option>`).join("");
+  }
+
+  function currentProduct() {
+    const id = Number(document.getElementById("product").value);
+    return allProducts.find((p) => p.id === id);
+  }
+
+  function currentYear2Digit() {
+    return String(new Date().getFullYear()).slice(-2);
+  }
+
+  function pad4(n) { return String(n).padStart(4, "0"); }
+
+  function updateBatchPreview() {
+    const abbrev = (document.getElementById("batchAbbrev").value || "PRD").toUpperCase();
+    const year = document.getElementById("batchYear").value;
+    const serial = Number(document.getElementById("batchSerial").value || 1);
+    const code = `${abbrev}-${year}-${pad4(serial)}`;
+    document.getElementById("batchPreview").textContent = code;
+    return code;
+  }
+
+  function currentBatchValue() {
+    const autoOn = document.getElementById("autoBatchToggle").checked;
+    return autoOn ? updateBatchPreview() : (document.getElementById("manualBatch").value.trim() || "—");
+  }
+
+  function toggleAutoBatchUI() {
+    const autoOn = document.getElementById("autoBatchToggle").checked;
+    document.getElementById("autoBatchFields").style.display = autoOn ? "block" : "none";
+    document.getElementById("manualBatchField").style.display = autoOn ? "none" : "block";
+  }
+  document.getElementById("autoBatchToggle").addEventListener("change", () => { toggleAutoBatchUI(); updatePreview(); });
+
+  function primeBatchFieldsForProduct(p) {
+    document.getElementById("batchAbbrev").value = p.batchAbbrev || abbrevFromName(p.name);
+    document.getElementById("batchYear").value = currentYear2Digit();
+    const nextSerial = (p.lastBatchSerial || 0) + 1;
+    document.getElementById("batchSerial").value = nextSerial;
+    document.getElementById("serialHint").textContent = p.lastBatchSerial
+      ? `Last batch used #${p.lastBatchSerial} — suggesting the next one.`
+      : "First batch for this product — starting at 1. Change it if you want to start elsewhere.";
+    serialCommitted = false;
+    updateBatchPreview();
+  }
+
+  ["batchAbbrev", "batchSerial"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", () => { serialCommitted = false; updatePreview(); });
+  });
+  document.getElementById("manualBatch").addEventListener("input", updatePreview);
+
+  async function updatePreview() {
+    const p = currentProduct();
+    if (!p) return;
+    const f = currentField();
+    const batchValue = currentBatchValue();
+
+    document.getElementById("lpName").style.display = f.name ? "block" : "none";
+    document.getElementById("lpName").textContent = p.name;
+
+    document.getElementById("lpBatch").style.display = f.batch ? "block" : "none";
+    document.getElementById("lpBatch").textContent = "Batch: " + batchValue;
+
+    document.getElementById("lpMrp").style.display = f.mrp ? "block" : "none";
+    document.getElementById("lpMrp").textContent = "MRP: ₹" + Number(p.mrp || 0).toFixed(2);
+
+    const mfg = document.getElementById("mfgDate").value;
+    const exp = document.getElementById("expiryDate").value;
+    document.getElementById("lpDates").style.display = (f.mfg || f.exp) ? "block" : "none";
+    document.getElementById("lpDates").textContent =
+      (f.mfg ? "Mfg: " + mfg : "") + (f.mfg && f.exp ? " · " : "") + (f.exp ? "Exp: " + exp : "");
+
+    const barcodeCanvas = document.getElementById("barcodeCanvas");
+    const qrCanvas = document.getElementById("qrCanvas");
+    if (f.barcode) {
+      barcodeCanvas.style.display = "block";
+      renderBarcode(barcodeCanvas, p.barcode || generateBarcodeValue(p), "CODE128");
+    } else {
+      barcodeCanvas.style.display = "none";
+    }
+    if (f.qr) {
+      qrCanvas.style.display = "block";
+      try { await renderQR(qrCanvas, JSON.stringify({ code: p.code, name: p.name, mrp: p.mrp, batch: batchValue })); }
+      catch (e) { /* nice-to-have only */ }
+    } else {
+      qrCanvas.style.display = "none";
+    }
+  }
+
+  document.getElementById("product").addEventListener("change", () => {
+    const p = currentProduct();
+    if (!p) return;
+    document.getElementById("mfgDate").value = new Date().toISOString().slice(0, 10);
+    document.getElementById("expiryDate").value = addDays(document.getElementById("mfgDate").value, p.expiryDays);
+    primeBatchFieldsForProduct(p);
+    updatePreview();
+  });
+  document.getElementById("mfgDate").addEventListener("change", () => {
+    const p = currentProduct();
+    document.getElementById("expiryDate").value = addDays(document.getElementById("mfgDate").value, p ? p.expiryDays : 180);
+    updatePreview();
+  });
+  document.getElementById("expiryDate").addEventListener("change", updatePreview);
+
+  /** Saves the used serial/abbreviation back onto the product so the next label
+   *  for this product suggests the next serial automatically. Only runs once
+   *  per "fresh" serial (guarded by serialCommitted) so printing the same label
+   *  twice doesn't skip numbers. */
+  async function commitBatchSerialIfNeeded() {
+    if (serialCommitted) return;
+    if (!document.getElementById("autoBatchToggle").checked) return;
+    const p = currentProduct();
+    if (!p) return;
+    const abbrev = (document.getElementById("batchAbbrev").value || "PRD").toUpperCase();
+    const serial = Number(document.getElementById("batchSerial").value || 1);
+    const updated = { ...p, batchAbbrev: abbrev, lastBatchSerial: serial };
+    await DB.put("products", updated);
+    await queueSync("products", p.id);
+    const idx = allProducts.findIndex((x) => x.id === p.id);
+    if (idx !== -1) allProducts[idx] = updated;
+    serialCommitted = true;
+  }
+
+  function currentLabelPayload() {
+    const p = currentProduct();
+    const f = currentField();
+    return {
+      name: p.name,
+      batch: currentBatchValue(),
+      mrp: p.mrp,
+      mfgDate: document.getElementById("mfgDate").value,
+      expiryDate: document.getElementById("expiryDate").value,
+      show: { name: f.name, batch: f.batch, mrp: f.mrp, mfgDate: f.mfg, expiryDate: f.exp },
+    };
+  }
+
+  document.getElementById("browserPrintBtn").addEventListener("click", async () => {
+    if (!currentProduct()) return;
+    await commitBatchSerialIfNeeded();
+    window.print();
+  });
+
+  document.getElementById("btPrintBtn").addEventListener("click", async () => {
+    const p = currentProduct();
+    if (!p) return;
+    if (!isPrinterConnected()) {
+      alert("No Bluetooth printer connected yet. Tap 'Connect' at the top first.");
+      return;
+    }
+    try {
+      await commitBatchSerialIfNeeded();
+      await printLabel(currentLabelPayload());
+      alert("Label sent to printer.");
+    } catch (err) {
+      alert("Couldn't print: " + err.message);
+    }
+  });
+
+  async function refreshPrinterStatus() {
+    const statusEl = document.getElementById("printerStatus");
+    const textEl = document.getElementById("printerStatusText");
+    if (isPrinterConnected()) {
+      statusEl.classList.add("connected");
+      textEl.textContent = "✅ Printer connected";
+      document.getElementById("connectBtn").textContent = "Disconnect";
+    } else {
+      statusEl.classList.remove("connected");
+      const last = await getLastPrinterInfo();
+      textEl.textContent = last ? `🔌 Not connected (last used: ${last.name})` : "🔌 No printer connected";
+      document.getElementById("connectBtn").textContent = "Connect";
+    }
+  }
+
+  document.getElementById("testBtn").addEventListener("click", async () => {
+    if (!isPrinterConnected()) { alert("Connect a printer first."); return; }
+    try { await printTest(); alert("Test sent to printer."); }
+    catch (err) { alert("Couldn't print: " + err.message); }
+  });
+
+  document.getElementById("connectBtn").addEventListener("click", async () => {
+    if (isPrinterConnected()) { disconnectPrinter(); await refreshPrinterStatus(); return; }
+    if (!isBluetoothSupported()) {
+      alert("Bluetooth printing needs Chrome or Edge (Android or desktop). It isn't available in this browser.");
+      return;
+    }
+    try { await connectPrinter(); await refreshPrinterStatus(); }
+    catch (err) { alert(err.message); }
+  });
+
+  (async () => {
+    await initDB();
+    await applyBranding();
+    const session = requireSession(["operator", "admin"]);
+    if (!session) return;
+    allProducts = await DB.getAll("products");
+    if (allProducts.length === 0) {
+      document.getElementById("formArea").style.display = "none";
+      document.getElementById("noProductsNote").style.display = "block";
+      return;
+    }
+    await loadFieldPrefs();
+    populateProducts();
+    toggleAutoBatchUI();
+
+    const first = allProducts[0];
+    document.getElementById("mfgDate").value = new Date().toISOString().slice(0, 10);
+    document.getElementById("expiryDate").value = addDays(document.getElementById("mfgDate").value, first.expiryDays);
+    primeBatchFieldsForProduct(first);
+    await updatePreview();
+    await refreshPrinterStatus();
+  })();
+</script>
+</body>
+</html>

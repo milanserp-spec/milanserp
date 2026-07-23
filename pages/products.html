@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FoodERP Lite — Products</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="mark">F</div><div class="name" id="brandName">FoodERP Lite</div></div>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <div class="section-label">Masters</div>
+      <a href="products.html" class="active">Products</a>
+      <a href="categories.html">Categories</a>
+      <a href="customers.html">Customers</a>
+      <a href="suppliers.html">Suppliers</a>
+      <div class="section-label">Operations</div>
+      <a href="purchase.html">Purchase</a>
+      <a href="production.html">Production</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="sales.html">Sales</a>
+      <div class="section-label">Tools</div>
+      <a href="reports.html">Reports</a>
+      <a href="sync.html">Sync</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="logout-btn" id="logoutBtn">Log Out</button>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div><h1>Products</h1><div class="greeting">Everything you sell or produce</div></div>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" class="search-input" id="searchBox" placeholder="Search by name or code..." />
+      <button class="btn-add" id="addBtn">+ Add Product</button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th></th><th>Code</th><th>Name</th><th>Category</th><th>MRP</th><th>Selling Price</th><th>Stock</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="empty-note" id="emptyNote" style="display:none;">
+        <div class="icon-circle">🛒</div>
+        <h3>No products yet</h3>
+        <p>Add your first product — this feeds Billing, Labels and Stock once those phases are live.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" style="display:none;">
+  <div class="modal-card">
+    <h2 id="modalTitle">Add Product</h2>
+    <div class="modal-sub">Barcode/QR image generation arrives in Phase 5 — for now, type the barcode number if you have one printed already</div>
+    <form id="productForm">
+      <input type="hidden" id="productId" />
+
+      <div class="field full">
+        <div class="image-upload">
+          <div class="image-preview" id="imagePreview">📦</div>
+          <div style="flex:1;">
+            <label for="imageFile">Product Photo (optional)</label>
+            <input type="file" id="imageFile" accept="image/*" />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-grid" style="margin-top:14px;">
+        <div class="field">
+          <label for="code">Product Code</label>
+          <input type="text" id="code" required placeholder="e.g. TUR-001" />
+        </div>
+        <div class="field">
+          <label for="name">Product Name</label>
+          <input type="text" id="name" required placeholder="e.g. Turmeric Powder 200g" />
+        </div>
+
+        <div class="field">
+          <label for="category">Category</label>
+          <select id="category"></select>
+        </div>
+        <div class="field">
+          <label for="unit">Unit</label>
+          <select id="unit">
+            <option>kg</option><option>g</option><option>ltr</option><option>ml</option>
+            <option>pcs</option><option>box</option><option>packet</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="weight">Weight / Volume</label>
+          <input type="text" id="weight" placeholder="e.g. 200g" />
+        </div>
+        <div class="field">
+          <label for="hsn">HSN Code</label>
+          <input type="text" id="hsn" placeholder="e.g. 0910" />
+        </div>
+
+        <div class="field">
+          <label for="gst">GST %</label>
+          <input type="number" id="gst" min="0" max="28" step="0.5" value="5" />
+        </div>
+        <div class="field">
+          <label for="mrp">MRP (₹)</label>
+          <input type="number" id="mrp" min="0" step="0.01" required />
+        </div>
+
+        <div class="field">
+          <label for="sellingPrice">Selling Price (₹)</label>
+          <input type="number" id="sellingPrice" min="0" step="0.01" required />
+        </div>
+        <div class="field">
+          <label for="barcode">Barcode Number</label>
+          <input type="text" id="barcode" placeholder="Scan or type" />
+        </div>
+
+        <div class="field">
+          <label for="manufacturingDays">Shelf Life — Mfg to Pack (days)</label>
+          <input type="number" id="manufacturingDays" min="0" value="0" />
+        </div>
+        <div class="field">
+          <label for="expiryDays">Shelf Life — Expiry (days)</label>
+          <input type="number" id="expiryDays" min="0" value="180" />
+        </div>
+
+        <div class="field">
+          <label for="stock">Opening Stock</label>
+          <input type="number" id="stock" min="0" step="0.01" value="0" />
+        </div>
+        <div class="field">
+          <label for="reorderLevel">Reorder Level</label>
+          <input type="number" id="reorderLevel" min="0" step="0.01" value="5" />
+        </div>
+
+        <div class="field">
+          <label for="status">Status</label>
+          <select id="status">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="barcodeOverlay" style="display:none;">
+  <div class="modal-card" style="max-width:360px; text-align:center;">
+    <h2 id="barcodeProductName">Product</h2>
+    <div class="label-preview" style="margin-top:10px;">
+      <canvas id="barcodeCanvas"></canvas>
+      <canvas id="qrCanvas" style="width:110px; height:110px;"></canvas>
+    </div>
+    <button type="button" class="btn btn-ghost" id="closeBarcodeBtn" style="margin-top:14px;">Close</button>
+  </div>
+</div>
+
+<script src="../js/vendor/jsbarcode.min.js"></script>
+<script src="../js/vendor/qrcode.min.js"></script>
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/barcode.js"></script>
+<script>
+  let allProducts = [];
+  let allCategories = [];
+  let currentImage = "";
+
+  async function loadCategoriesIntoSelect() {
+    allCategories = await DB.getAll("categories");
+    const select = document.getElementById("category");
+    select.innerHTML = "";
+    if (allCategories.length === 0) {
+      select.innerHTML = `<option value="">No categories yet — add one first</option>`;
+      return;
+    }
+    allCategories
+      .filter((c) => c.status !== "inactive")
+      .forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c.name;
+        opt.textContent = c.name;
+        select.appendChild(opt);
+      });
+  }
+
+  async function loadProducts() {
+    allProducts = await DB.getAll("products");
+    renderTable(allProducts);
+  }
+
+  function renderTable(list) {
+    const body = document.getElementById("tableBody");
+    const empty = document.getElementById("emptyNote");
+    body.innerHTML = "";
+    if (list.length === 0) { empty.style.display = "block"; return; }
+    empty.style.display = "none";
+    list.forEach((p) => {
+      const lowStock = (p.stock || 0) <= (p.reorderLevel || 0);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${p.image ? `<img src="${p.image}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;">` : `<div class="image-preview" style="width:36px;height:36px;font-size:1rem;">📦</div>`}</td>
+        <td>${escapeHtml(p.code)}</td>
+        <td><strong>${escapeHtml(p.name)}</strong></td>
+        <td>${escapeHtml(p.category || "—")}</td>
+        <td>₹${Number(p.mrp || 0).toFixed(2)}</td>
+        <td>₹${Number(p.sellingPrice || 0).toFixed(2)}</td>
+        <td>${lowStock ? `<span class="badge inactive">${p.stock ?? 0} low</span>` : (p.stock ?? 0)}</td>
+        <td><span class="badge ${p.status === "active" ? "active" : "inactive"}">${p.status}</span></td>
+        <td>
+          <div class="row-actions">
+            <button class="icon-btn" data-barcode="${p.id}" title="View Barcode">🏷️</button>
+            <button class="icon-btn" data-edit="${p.id}" title="Edit">✏️</button>
+            <button class="icon-btn danger" data-delete="${p.id}" title="Delete">🗑️</button>
+          </div>
+        </td>`;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll("[data-barcode]").forEach(btn =>
+      btn.addEventListener("click", () => showBarcode(Number(btn.dataset.barcode))));
+    body.querySelectorAll("[data-edit]").forEach(btn =>
+      btn.addEventListener("click", () => openModal(Number(btn.dataset.edit))));
+    body.querySelectorAll("[data-delete]").forEach(btn =>
+      btn.addEventListener("click", () => deleteProduct(Number(btn.dataset.delete))));
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str ?? "";
+    return div.innerHTML;
+  }
+
+  async function openModal(id) {
+    await loadCategoriesIntoSelect();
+    const form = document.getElementById("productForm");
+    form.reset();
+    currentImage = "";
+    document.getElementById("imagePreview").innerHTML = "📦";
+    document.getElementById("productId").value = "";
+    document.getElementById("modalTitle").textContent = "Add Product";
+
+    if (id) {
+      const p = allProducts.find((x) => x.id === id);
+      if (p) {
+        document.getElementById("modalTitle").textContent = "Edit Product";
+        document.getElementById("productId").value = p.id;
+        document.getElementById("code").value = p.code || "";
+        document.getElementById("name").value = p.name || "";
+        document.getElementById("category").value = p.category || "";
+        document.getElementById("unit").value = p.unit || "kg";
+        document.getElementById("weight").value = p.weight || "";
+        document.getElementById("hsn").value = p.hsn || "";
+        document.getElementById("gst").value = p.gst ?? 5;
+        document.getElementById("mrp").value = p.mrp ?? "";
+        document.getElementById("sellingPrice").value = p.sellingPrice ?? "";
+        document.getElementById("barcode").value = p.barcode || "";
+        document.getElementById("manufacturingDays").value = p.manufacturingDays ?? 0;
+        document.getElementById("expiryDays").value = p.expiryDays ?? 180;
+        document.getElementById("stock").value = p.stock ?? 0;
+        document.getElementById("reorderLevel").value = p.reorderLevel ?? 5;
+        document.getElementById("status").value = p.status || "active";
+        if (p.image) {
+          currentImage = p.image;
+          document.getElementById("imagePreview").innerHTML = `<img src="${p.image}">`;
+        }
+      }
+    }
+    document.getElementById("modalOverlay").style.display = "flex";
+  }
+
+  async function showBarcode(id) {
+    const p = allProducts.find((x) => x.id === id);
+    if (!p) return;
+    document.getElementById("barcodeProductName").textContent = p.name;
+    const value = p.barcode || generateBarcodeValue(p);
+    renderBarcode(document.getElementById("barcodeCanvas"), value, "CODE128");
+    try {
+      await renderQR(document.getElementById("qrCanvas"), JSON.stringify({ code: p.code, name: p.name, mrp: p.mrp }));
+    } catch (e) { /* ignore */ }
+    document.getElementById("barcodeOverlay").style.display = "flex";
+  }
+  document.getElementById("closeBarcodeBtn").addEventListener("click", () => {
+    document.getElementById("barcodeOverlay").style.display = "none";
+  });
+
+  function closeModal() { document.getElementById("modalOverlay").style.display = "none"; }
+
+  async function deleteProduct(id) {
+    if (!confirm("Delete this product?")) return;
+    await DB.delete("products", id);
+    await loadProducts();
+  }
+
+  document.getElementById("addBtn").addEventListener("click", () => openModal(null));
+  document.getElementById("cancelBtn").addEventListener("click", closeModal);
+  document.getElementById("modalOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "modalOverlay") closeModal();
+  });
+
+  document.getElementById("imageFile").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      currentImage = reader.result;
+      document.getElementById("imagePreview").innerHTML = `<img src="${currentImage}">`;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById("productForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = document.getElementById("productId").value;
+    const record = {
+      code: document.getElementById("code").value.trim(),
+      name: document.getElementById("name").value.trim(),
+      category: document.getElementById("category").value,
+      unit: document.getElementById("unit").value,
+      weight: document.getElementById("weight").value.trim(),
+      hsn: document.getElementById("hsn").value.trim(),
+      gst: Number(document.getElementById("gst").value || 0),
+      mrp: Number(document.getElementById("mrp").value || 0),
+      sellingPrice: Number(document.getElementById("sellingPrice").value || 0),
+      barcode: document.getElementById("barcode").value.trim(),
+      manufacturingDays: Number(document.getElementById("manufacturingDays").value || 0),
+      expiryDays: Number(document.getElementById("expiryDays").value || 0),
+      stock: Number(document.getElementById("stock").value || 0),
+      reorderLevel: Number(document.getElementById("reorderLevel").value || 0),
+      status: document.getElementById("status").value,
+      image: currentImage,
+      updatedAt: Date.now(),
+    };
+    try {
+      if (id) { record.id = Number(id); await DB.put("products", record); await queueSync("products", record.id); }
+      else { record.createdAt = Date.now(); record.uid = genUID(); const newId = await DB.add("products", record); await queueSync("products", newId); }
+      closeModal();
+      await loadProducts();
+    } catch (err) {
+      alert("Could not save: " + (err.message || "Product code might already be in use."));
+    }
+  });
+
+  document.getElementById("searchBox").addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase();
+    renderTable(allProducts.filter((p) =>
+      (p.name || "").toLowerCase().includes(q) || (p.code || "").toLowerCase().includes(q)));
+  });
+
+  document.querySelectorAll("[data-stub]").forEach(a => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      alert(a.dataset.stub + " isn't built yet. It will appear here once that phase is complete.");
+    });
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    if (confirm("Log out now?")) logout();
+  });
+
+  (async () => {
+    await initDB();
+    await applyBranding();
+    const session = requireSession(["admin"]);
+    if (!session) return;
+    await loadProducts();
+  })();
+</script>
+</body>
+</html>

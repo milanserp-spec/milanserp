@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FoodERP Lite — Reports</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+<style>
+  @media print {
+    .sidebar, .filter-bar .export-btn, .topbar, .type-tabs { display: none !important; }
+    .main { padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="mark">F</div><div class="name" id="brandName">FoodERP Lite</div></div>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <div class="section-label">Masters</div>
+      <a href="products.html">Products</a>
+      <a href="categories.html">Categories</a>
+      <a href="customers.html">Customers</a>
+      <a href="suppliers.html">Suppliers</a>
+      <div class="section-label">Operations</div>
+      <a href="purchase.html">Purchase</a>
+      <a href="production.html">Production</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="sales.html">Sales</a>
+      <div class="section-label">Tools</div>
+      <a href="reports.html" class="active">Reports</a>
+      <a href="sync.html">Sync</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="logout-btn" id="logoutBtn">Log Out</button>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div><h1>Reports</h1><div class="greeting">Sales, GST, inventory, purchase and production — all in one place</div></div>
+    </div>
+
+    <div class="type-tabs" id="reportTabs">
+      <button class="type-tab active" data-tab="sales">Sales</button>
+      <button class="type-tab" data-tab="gst">GST</button>
+      <button class="type-tab" data-tab="inventory">Inventory</button>
+      <button class="type-tab" data-tab="purchase">Purchase</button>
+      <button class="type-tab" data-tab="production">Production</button>
+    </div>
+
+    <div class="filter-bar" id="dateFilterBar">
+      <button class="preset-btn" data-preset="today">Today</button>
+      <button class="preset-btn" data-preset="week">This Week</button>
+      <button class="preset-btn active" data-preset="month">This Month</button>
+      <button class="preset-btn" data-preset="year">This Year</button>
+      <input type="date" id="fromDate" />
+      <span style="color:var(--color-text-muted);">to</span>
+      <input type="date" id="toDate" />
+      <button class="export-btn" id="exportBtn">⬇ Export CSV</button>
+      <button class="export-btn" id="printBtn" style="background:var(--color-border); color:var(--color-text);">🖨️ Print / PDF</button>
+    </div>
+
+    <!-- ===== SALES TAB ===== -->
+    <div id="tab-sales" class="report-tab">
+      <div class="card-grid" style="margin-bottom:20px;">
+        <div class="stat-card"><div class="label">Total Sales</div><div class="value" id="salesTotal">₹0</div></div>
+        <div class="stat-card"><div class="label">Orders</div><div class="value" id="salesOrders">0</div></div>
+        <div class="stat-card"><div class="label">Avg Order Value</div><div class="value" id="salesAvg">₹0</div></div>
+        <div class="stat-card"><div class="label">GST Collected</div><div class="value" id="salesGst">₹0</div></div>
+      </div>
+      <div class="chart-row">
+        <div class="chart-card"><h3>Sales Over Time</h3><canvas id="salesTrendChart"></canvas></div>
+        <div class="chart-card"><h3>Payment Method Split</h3><canvas id="paymentChart"></canvas></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Product</th><th>Qty Sold</th><th>Revenue</th></tr></thead>
+          <tbody id="topProductsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== GST TAB ===== -->
+    <div id="tab-gst" class="report-tab" style="display:none;">
+      <div class="card-grid" style="margin-bottom:20px;">
+        <div class="stat-card"><div class="label">GST Collected (Sales)</div><div class="value" id="gstCollected">₹0</div></div>
+        <div class="stat-card"><div class="label">GST Paid (Purchases)</div><div class="value" id="gstPaid">₹0</div></div>
+        <div class="stat-card"><div class="label">Net GST Payable</div><div class="value" id="gstNet">₹0</div></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>GST Slab</th><th>Taxable Amount (Sales)</th><th>GST Collected</th></tr></thead>
+          <tbody id="gstSlabBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== INVENTORY TAB ===== -->
+    <div id="tab-inventory" class="report-tab" style="display:none;">
+      <div class="card-grid" style="margin-bottom:20px;">
+        <div class="stat-card"><div class="label">Stock Value</div><div class="value" id="invValue">₹0</div></div>
+        <div class="stat-card"><div class="label">Products</div><div class="value" id="invCount">0</div></div>
+        <div class="stat-card"><div class="label">Low Stock Items</div><div class="value danger" id="invLow">0</div></div>
+        <div class="stat-card"><div class="label">Stock Movements (range)</div><div class="value" id="invMoves">0</div></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Product</th><th>Category</th><th>Current Stock</th><th>Reorder Level</th><th>Stock Value</th><th>Status</th></tr></thead>
+          <tbody id="inventoryBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== PURCHASE TAB ===== -->
+    <div id="tab-purchase" class="report-tab" style="display:none;">
+      <div class="card-grid" style="margin-bottom:20px;">
+        <div class="stat-card"><div class="label">Total Purchases</div><div class="value" id="purchTotal">₹0</div></div>
+        <div class="stat-card"><div class="label">Invoices</div><div class="value" id="purchCount">0</div></div>
+        <div class="stat-card"><div class="label">GST Paid</div><div class="value" id="purchGst">₹0</div></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Supplier</th><th>Invoices</th><th>Total Amount</th></tr></thead>
+          <tbody id="purchaseBySupplierBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== PRODUCTION TAB ===== -->
+    <div id="tab-production" class="report-tab" style="display:none;">
+      <div class="card-grid" style="margin-bottom:20px;">
+        <div class="stat-card"><div class="label">Batches Produced</div><div class="value" id="prodBatches">0</div></div>
+        <div class="stat-card"><div class="label">Total Quantity</div><div class="value" id="prodQty">0</div></div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Product</th><th>Batches</th><th>Total Quantity</th></tr></thead>
+          <tbody id="productionByProductBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="../js/vendor/chart.min.js"></script>
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/reports-helpers.js"></script>
+<script>
+  let allSales = [], allSaleItems = [], allProducts = [], allPurchases = [], allPurchaseItems = [],
+      allSuppliers = [], allProduction = [], allInventory = [];
+  let currentTab = "sales";
+  let currentRange = dateRangePreset("month");
+  let salesTrendChartInst = null, paymentChartInst = null;
+
+  function inRange(ts) { return ts >= currentRange.from.getTime() && ts <= currentRange.to.getTime(); }
+
+  async function loadAllData() {
+    [allSales, allSaleItems, allProducts, allPurchases, allPurchaseItems, allSuppliers, allProduction, allInventory] =
+      await Promise.all([
+        DB.getAll("sales"), DB.getAll("sale_items"), DB.getAll("products"),
+        DB.getAll("purchase"), DB.getAll("purchase_items"), DB.getAll("suppliers"),
+        DB.getAll("production"), DB.getAll("inventory"),
+      ]);
+  }
+
+  /* ---------- Tabs ---------- */
+
+  document.querySelectorAll("#reportTabs .type-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll("#reportTabs .type-tab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      document.querySelectorAll(".report-tab").forEach((el) => el.style.display = "none");
+      currentTab = tab.dataset.tab;
+      document.getElementById("tab-" + currentTab).style.display = "block";
+      renderCurrentTab();
+    });
+  });
+
+  /* ---------- Date filter ---------- */
+
+  document.querySelectorAll(".preset-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".preset-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentRange = dateRangePreset(btn.dataset.preset);
+      document.getElementById("fromDate").value = toDateInputValue(currentRange.from);
+      document.getElementById("toDate").value = toDateInputValue(currentRange.to);
+      renderCurrentTab();
+    });
+  });
+
+  function customRangeChanged() {
+    document.querySelectorAll(".preset-btn").forEach((b) => b.classList.remove("active"));
+    const from = document.getElementById("fromDate").value;
+    const to = document.getElementById("toDate").value;
+    if (!from || !to) return;
+    currentRange = { from: startOfDay(new Date(from)), to: endOfDay(new Date(to)) };
+    renderCurrentTab();
+  }
+  document.getElementById("fromDate").addEventListener("change", customRangeChanged);
+  document.getElementById("toDate").addEventListener("change", customRangeChanged);
+
+  document.getElementById("printBtn").addEventListener("click", () => window.print());
+
+  /* ---------- Renderers ---------- */
+
+  function renderCurrentTab() {
+    if (currentTab === "sales") renderSales();
+    else if (currentTab === "gst") renderGst();
+    else if (currentTab === "inventory") renderInventory();
+    else if (currentTab === "purchase") renderPurchase();
+    else if (currentTab === "production") renderProduction();
+  }
+
+  function renderSales() {
+    const sales = allSales.filter((s) => inRange(s.date));
+    const total = sales.reduce((sum, s) => sum + (s.total || 0), 0);
+    const gst = sales.reduce((sum, s) => sum + (s.gst || 0), 0);
+    document.getElementById("salesTotal").textContent = money(total);
+    document.getElementById("salesOrders").textContent = sales.length;
+    document.getElementById("salesAvg").textContent = money(sales.length ? total / sales.length : 0);
+    document.getElementById("salesGst").textContent = money(gst);
+
+    // Daily trend
+    const byDay = {};
+    sales.forEach((s) => {
+      const key = new Date(s.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+      byDay[key] = (byDay[key] || 0) + s.total;
+    });
+    const dayLabels = Object.keys(byDay);
+    if (salesTrendChartInst) salesTrendChartInst.destroy();
+    salesTrendChartInst = new Chart(document.getElementById("salesTrendChart"), {
+      type: "bar",
+      data: { labels: dayLabels, datasets: [{ label: "Sales (₹)", data: dayLabels.map((k) => byDay[k]), backgroundColor: "#1B4B43" }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+
+    // Payment split
+    const byPayment = {};
+    sales.forEach((s) => { byPayment[s.payment] = (byPayment[s.payment] || 0) + s.total; });
+    if (paymentChartInst) paymentChartInst.destroy();
+    paymentChartInst = new Chart(document.getElementById("paymentChart"), {
+      type: "doughnut",
+      data: {
+        labels: Object.keys(byPayment),
+        datasets: [{ data: Object.values(byPayment), backgroundColor: ["#1B4B43", "#E8A33D", "#4C7A4F", "#C1441E"] }],
+      },
+      options: { responsive: true },
+    });
+
+    // Top products
+    const saleIdsInRange = new Set(sales.map((s) => s.id));
+    const items = allSaleItems.filter((i) => saleIdsInRange.has(i.saleId));
+    const byProduct = {};
+    items.forEach((i) => {
+      if (!byProduct[i.name]) byProduct[i.name] = { qty: 0, revenue: 0 };
+      byProduct[i.name].qty += i.qty;
+      byProduct[i.name].revenue += i.price * i.qty;
+    });
+    const rows = Object.entries(byProduct).sort((a, b) => b[1].revenue - a[1].revenue);
+    document.getElementById("topProductsBody").innerHTML = rows.length
+      ? rows.map(([name, d]) => `<tr><td>${name}</td><td>${d.qty}</td><td>${money(d.revenue)}</td></tr>`).join("")
+      : `<tr><td colspan="3" style="text-align:center; color:var(--color-text-muted); padding:24px;">No sales in this range</td></tr>`;
+  }
+
+  function renderGst() {
+    const sales = allSales.filter((s) => inRange(s.date));
+    const purchases = allPurchases.filter((p) => inRange(p.date));
+    const gstCollected = sales.reduce((sum, s) => sum + (s.gst || 0), 0);
+    const gstPaid = purchases.reduce((sum, p) => sum + (p.gstTotal || 0), 0);
+    document.getElementById("gstCollected").textContent = money(gstCollected);
+    document.getElementById("gstPaid").textContent = money(gstPaid);
+    document.getElementById("gstNet").textContent = money(gstCollected - gstPaid);
+
+    const saleIdsInRange = new Set(sales.map((s) => s.id));
+    const items = allSaleItems.filter((i) => saleIdsInRange.has(i.saleId));
+    const bySlab = {};
+    items.forEach((i) => {
+      const slab = (i.gst || 0) + "%";
+      if (!bySlab[slab]) bySlab[slab] = { taxable: 0, gst: 0 };
+      bySlab[slab].taxable += i.price * i.qty;
+      bySlab[slab].gst += i.price * i.qty * (i.gst / 100);
+    });
+    const rows = Object.entries(bySlab).sort((a, b) => a[0].localeCompare(b[0]));
+    document.getElementById("gstSlabBody").innerHTML = rows.length
+      ? rows.map(([slab, d]) => `<tr><td>${slab}</td><td>${money(d.taxable)}</td><td>${money(d.gst)}</td></tr>`).join("")
+      : `<tr><td colspan="3" style="text-align:center; color:var(--color-text-muted); padding:24px;">No sales in this range</td></tr>`;
+  }
+
+  function renderInventory() {
+    const stockValue = allProducts.reduce((sum, p) => sum + (p.stock || 0) * (p.sellingPrice || 0), 0);
+    const lowStock = allProducts.filter((p) => (p.stock || 0) <= (p.reorderLevel || 0));
+    const moves = allInventory.filter((m) => inRange(m.date));
+    document.getElementById("invValue").textContent = money(stockValue);
+    document.getElementById("invCount").textContent = allProducts.length;
+    document.getElementById("invLow").textContent = lowStock.length;
+    document.getElementById("invMoves").textContent = moves.length;
+
+    document.getElementById("inventoryBody").innerHTML = allProducts.length
+      ? allProducts.map((p) => {
+          const low = (p.stock || 0) <= (p.reorderLevel || 0);
+          return `<tr>
+            <td>${p.name}</td><td>${p.category || "—"}</td>
+            <td>${p.stock ?? 0} ${p.unit || ""}</td><td>${p.reorderLevel ?? 0}</td>
+            <td>${money((p.stock || 0) * (p.sellingPrice || 0))}</td>
+            <td><span class="badge ${low ? "inactive" : "active"}">${low ? "Low" : "OK"}</span></td>
+          </tr>`;
+        }).join("")
+      : `<tr><td colspan="6" style="text-align:center; color:var(--color-text-muted); padding:24px;">No products yet</td></tr>`;
+  }
+
+  function renderPurchase() {
+    const purchases = allPurchases.filter((p) => inRange(p.date));
+    const total = purchases.reduce((sum, p) => sum + (p.total || 0), 0);
+    const gst = purchases.reduce((sum, p) => sum + (p.gstTotal || 0), 0);
+    document.getElementById("purchTotal").textContent = money(total);
+    document.getElementById("purchCount").textContent = purchases.length;
+    document.getElementById("purchGst").textContent = money(gst);
+
+    const bySupplier = {};
+    purchases.forEach((p) => {
+      const supplier = allSuppliers.find((s) => s.id === p.supplierId);
+      const name = supplier ? supplier.name : "Unknown";
+      if (!bySupplier[name]) bySupplier[name] = { count: 0, total: 0 };
+      bySupplier[name].count += 1;
+      bySupplier[name].total += p.total || 0;
+    });
+    const rows = Object.entries(bySupplier).sort((a, b) => b[1].total - a[1].total);
+    document.getElementById("purchaseBySupplierBody").innerHTML = rows.length
+      ? rows.map(([name, d]) => `<tr><td>${name}</td><td>${d.count}</td><td>${money(d.total)}</td></tr>`).join("")
+      : `<tr><td colspan="3" style="text-align:center; color:var(--color-text-muted); padding:24px;">No purchases in this range</td></tr>`;
+  }
+
+  function renderProduction() {
+    const entries = allProduction.filter((p) => inRange(p.date));
+    const totalQty = entries.reduce((sum, p) => sum + (p.quantity || 0), 0);
+    document.getElementById("prodBatches").textContent = entries.length;
+    document.getElementById("prodQty").textContent = totalQty;
+
+    const byProduct = {};
+    entries.forEach((e) => {
+      const product = allProducts.find((p) => p.id === e.productId);
+      const name = product ? product.name : "Unknown";
+      if (!byProduct[name]) byProduct[name] = { batches: 0, qty: 0 };
+      byProduct[name].batches += 1;
+      byProduct[name].qty += e.quantity || 0;
+    });
+    const rows = Object.entries(byProduct).sort((a, b) => b[1].qty - a[1].qty);
+    document.getElementById("productionByProductBody").innerHTML = rows.length
+      ? rows.map(([name, d]) => `<tr><td>${name}</td><td>${d.batches}</td><td>${d.qty}</td></tr>`).join("")
+      : `<tr><td colspan="3" style="text-align:center; color:var(--color-text-muted); padding:24px;">No production in this range</td></tr>`;
+  }
+
+  /* ---------- Export ---------- */
+
+  document.getElementById("exportBtn").addEventListener("click", () => {
+    const rangeLabel = toDateInputValue(currentRange.from) + "_to_" + toDateInputValue(currentRange.to);
+    if (currentTab === "sales") {
+      const sales = allSales.filter((s) => inRange(s.date));
+      downloadCSV(`sales_${rangeLabel}`, [
+        ["Invoice", "Date", "Customer", "Payment", "Subtotal", "GST", "Discount", "Total"],
+        ...sales.map((s) => [s.invoiceNo, new Date(s.date).toLocaleString("en-IN"), s.customerName, s.payment, s.subtotal, s.gst, s.discount, s.total]),
+      ]);
+    } else if (currentTab === "gst") {
+      const sales = allSales.filter((s) => inRange(s.date));
+      downloadCSV(`gst_${rangeLabel}`, [
+        ["Invoice", "Date", "Subtotal", "GST"],
+        ...sales.map((s) => [s.invoiceNo, new Date(s.date).toLocaleString("en-IN"), s.subtotal, s.gst]),
+      ]);
+    } else if (currentTab === "inventory") {
+      downloadCSV(`inventory_${rangeLabel}`, [
+        ["Product", "Category", "Current Stock", "Reorder Level", "Stock Value"],
+        ...allProducts.map((p) => [p.name, p.category || "", p.stock ?? 0, p.reorderLevel ?? 0, (p.stock || 0) * (p.sellingPrice || 0)]),
+      ]);
+    } else if (currentTab === "purchase") {
+      const purchases = allPurchases.filter((p) => inRange(p.date));
+      downloadCSV(`purchase_${rangeLabel}`, [
+        ["Invoice No.", "Date", "Supplier", "Items", "Total"],
+        ...purchases.map((p) => {
+          const supplier = allSuppliers.find((s) => s.id === p.supplierId);
+          return [p.invoiceNo, new Date(p.date).toLocaleDateString("en-IN"), supplier ? supplier.name : "Unknown", p.itemCount, p.total];
+        }),
+      ]);
+    } else if (currentTab === "production") {
+      const entries = allProduction.filter((p) => inRange(p.date));
+      downloadCSV(`production_${rangeLabel}`, [
+        ["Batch", "Product", "Quantity", "Mfg Date", "Expiry Date", "Operator"],
+        ...entries.map((e) => {
+          const product = allProducts.find((p) => p.id === e.productId);
+          return [e.batch, product ? product.name : "Unknown", e.quantity, new Date(e.mfgDate).toLocaleDateString("en-IN"), new Date(e.expiryDate).toLocaleDateString("en-IN"), e.operatorName];
+        }),
+      ]);
+    }
+  });
+
+  document.querySelectorAll("[data-stub]").forEach(a => {
+    a.addEventListener("click", (e) => { e.preventDefault(); alert(a.dataset.stub + " isn't built yet."); });
+  });
+  document.getElementById("logoutBtn").addEventListener("click", () => { if (confirm("Log out now?")) logout(); });
+
+  (async () => {
+    await initDB();
+    await applyBranding();
+    const session = requireSession(["admin"]);
+    if (!session) return;
+    await loadAllData();
+    document.getElementById("fromDate").value = toDateInputValue(currentRange.from);
+    document.getElementById("toDate").value = toDateInputValue(currentRange.to);
+    renderCurrentTab();
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FoodERP Lite — Purchase Entry</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="mark">F</div><div class="name" id="brandName">FoodERP Lite</div></div>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <div class="section-label">Masters</div>
+      <a href="products.html">Products</a>
+      <a href="categories.html">Categories</a>
+      <a href="customers.html">Customers</a>
+      <a href="suppliers.html">Suppliers</a>
+      <div class="section-label">Operations</div>
+      <a href="purchase.html" class="active">Purchase</a>
+      <a href="production.html">Production</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="sales.html">Sales</a>
+      <div class="section-label">Tools</div>
+      <a href="reports.html">Reports</a>
+      <a href="sync.html">Sync</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="logout-btn" id="logoutBtn">Log Out</button>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div><h1>Purchase Entry</h1><div class="greeting">Record stock bought from a supplier — stock updates automatically</div></div>
+      <button class="btn-add" id="newBtn">+ New Purchase</button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Invoice No.</th><th>Date</th><th>Supplier</th><th>Items</th><th>Total</th></tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="empty-note" id="emptyNote" style="display:none;">
+        <div class="icon-circle">🚚</div>
+        <h3>No purchases recorded yet</h3>
+        <p>Click "+ New Purchase" to record your first supplier invoice.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" style="display:none;">
+  <div class="modal-card" style="max-width:760px;">
+    <h2>New Purchase</h2>
+    <div class="modal-sub">Adding items here increases product stock right away</div>
+
+    <form id="purchaseForm">
+      <div class="form-grid">
+        <div class="field">
+          <label for="supplier">Supplier</label>
+          <select id="supplier" required></select>
+        </div>
+        <div class="field">
+          <label for="invoiceNo">Supplier Invoice No.</label>
+          <input type="text" id="invoiceNo" placeholder="e.g. INV-2201" />
+        </div>
+        <div class="field">
+          <label for="date">Date</label>
+          <input type="date" id="date" required />
+        </div>
+      </div>
+
+      <div class="line-items-wrap">
+        <table class="line-items-table">
+          <thead>
+            <tr><th style="width:32%;">Product</th><th style="width:14%;">Qty</th><th style="width:18%;">Rate (₹)</th><th style="width:12%;">GST %</th><th style="width:18%;">Amount</th><th></th></tr>
+          </thead>
+          <tbody id="itemRows"></tbody>
+        </table>
+        <button type="button" class="add-row-btn" id="addRowBtn">+ Add Item</button>
+      </div>
+
+      <div class="totals-box">
+        <div class="totals-row"><span>Subtotal</span><span id="subtotalVal">₹0.00</span></div>
+        <div class="totals-row"><span>GST</span><span id="gstVal">₹0.00</span></div>
+        <div class="totals-row grand"><span>Total</span><span id="grandTotalVal">₹0.00</span></div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Purchase</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script>
+  let allProducts = [];
+  let allSuppliers = [];
+  let allPurchases = [];
+  let rowSeq = 0;
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str ?? "";
+    return div.innerHTML;
+  }
+
+  async function loadReferenceData() {
+    allProducts = await DB.getAll("products");
+    allSuppliers = await DB.getAll("suppliers");
+  }
+
+  async function loadPurchases() {
+    allPurchases = await DB.getAll("purchase");
+    renderTable(allPurchases.sort((a, b) => b.date - a.date));
+  }
+
+  function renderTable(list) {
+    const body = document.getElementById("tableBody");
+    const empty = document.getElementById("emptyNote");
+    body.innerHTML = "";
+    if (list.length === 0) { empty.style.display = "block"; return; }
+    empty.style.display = "none";
+    list.forEach((p) => {
+      const supplier = allSuppliers.find((s) => s.id === p.supplierId);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(p.invoiceNo || "—")}</td>
+        <td>${new Date(p.date).toLocaleDateString("en-IN")}</td>
+        <td>${escapeHtml(supplier ? supplier.name : "Unknown")}</td>
+        <td>${p.itemCount} item${p.itemCount === 1 ? "" : "s"}</td>
+        <td><strong>₹${Number(p.total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></td>`;
+      body.appendChild(tr);
+    });
+  }
+
+  function populateSupplierSelect() {
+    const select = document.getElementById("supplier");
+    select.innerHTML = allSuppliers.length
+      ? allSuppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("")
+      : `<option value="">No suppliers yet — add one first</option>`;
+  }
+
+  function productOptions(selectedId) {
+    if (allProducts.length === 0) return `<option value="">No products yet</option>`;
+    return allProducts
+      .map((p) => `<option value="${p.id}" ${p.id === selectedId ? "selected" : ""}>${escapeHtml(p.name)} (${escapeHtml(p.code)})</option>`)
+      .join("");
+  }
+
+  function addRow(productId, qty, rate, gst) {
+    const id = "row" + (++rowSeq);
+    const product = allProducts.find((p) => p.id === productId) || allProducts[0];
+    const tr = document.createElement("tr");
+    tr.id = id;
+    tr.innerHTML = `
+      <td><select class="row-product">${productOptions(product ? product.id : null)}</select></td>
+      <td><input type="number" class="row-qty" min="0" step="0.01" value="${qty ?? 1}" /></td>
+      <td><input type="number" class="row-rate" min="0" step="0.01" value="${rate ?? (product ? product.mrp : 0)}" /></td>
+      <td><input type="number" class="row-gst" min="0" step="0.5" value="${gst ?? (product ? product.gst : 0)}" /></td>
+      <td class="amt-cell row-amt">₹0.00</td>
+      <td><button type="button" class="remove-row-btn" title="Remove">✕</button></td>`;
+    document.getElementById("itemRows").appendChild(tr);
+
+    tr.querySelectorAll("input, select").forEach((el) => el.addEventListener("input", recalc));
+    tr.querySelector(".remove-row-btn").addEventListener("click", () => { tr.remove(); recalc(); });
+    recalc();
+  }
+
+  function recalc() {
+    let subtotal = 0, gstTotal = 0;
+    document.querySelectorAll("#itemRows tr").forEach((tr) => {
+      const qty = Number(tr.querySelector(".row-qty").value || 0);
+      const rate = Number(tr.querySelector(".row-rate").value || 0);
+      const gst = Number(tr.querySelector(".row-gst").value || 0);
+      const amount = qty * rate;
+      const gstAmt = amount * (gst / 100);
+      tr.querySelector(".row-amt").textContent = "₹" + (amount + gstAmt).toFixed(2);
+      subtotal += amount;
+      gstTotal += gstAmt;
+    });
+    document.getElementById("subtotalVal").textContent = "₹" + subtotal.toFixed(2);
+    document.getElementById("gstVal").textContent = "₹" + gstTotal.toFixed(2);
+    document.getElementById("grandTotalVal").textContent = "₹" + (subtotal + gstTotal).toFixed(2);
+  }
+
+  function openModal() {
+    document.getElementById("purchaseForm").reset();
+    document.getElementById("date").value = new Date().toISOString().slice(0, 10);
+    document.getElementById("itemRows").innerHTML = "";
+    populateSupplierSelect();
+    if (allProducts.length > 0) addRow();
+    recalc();
+    document.getElementById("modalOverlay").style.display = "flex";
+  }
+  function closeModal() { document.getElementById("modalOverlay").style.display = "none"; }
+
+  document.getElementById("newBtn").addEventListener("click", () => {
+    if (allSuppliers.length === 0) { alert("Add a supplier first (Suppliers page)."); return; }
+    if (allProducts.length === 0) { alert("Add a product first (Products page)."); return; }
+    openModal();
+  });
+  document.getElementById("cancelBtn").addEventListener("click", closeModal);
+  document.getElementById("modalOverlay").addEventListener("click", (e) => { if (e.target.id === "modalOverlay") closeModal(); });
+  document.getElementById("addRowBtn").addEventListener("click", () => addRow());
+
+  document.getElementById("purchaseForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const rows = Array.from(document.querySelectorAll("#itemRows tr")).map((tr) => ({
+      productId: Number(tr.querySelector(".row-product").value),
+      qty: Number(tr.querySelector(".row-qty").value || 0),
+      rate: Number(tr.querySelector(".row-rate").value || 0),
+      gst: Number(tr.querySelector(".row-gst").value || 0),
+    })).filter((r) => r.productId && r.qty > 0);
+
+    if (rows.length === 0) { alert("Add at least one item with a quantity."); return; }
+
+    const subtotal = rows.reduce((s, r) => s + r.qty * r.rate, 0);
+    const gstTotal = rows.reduce((s, r) => s + r.qty * r.rate * (r.gst / 100), 0);
+
+    const purchaseId = await DB.add("purchase", {
+      uid: genUID(),
+      supplierId: Number(document.getElementById("supplier").value),
+      supplierUid: (allSuppliers.find((s) => s.id === Number(document.getElementById("supplier").value)) || {}).uid || null,
+      invoiceNo: document.getElementById("invoiceNo").value.trim(),
+      date: new Date(document.getElementById("date").value).getTime(),
+      itemCount: rows.length,
+      subtotal, gstTotal, total: subtotal + gstTotal,
+      createdAt: Date.now(),
+    });
+    await queueSync("purchase", purchaseId);
+
+    for (const r of rows) {
+      await DB.add("purchase_items", {
+        purchaseId, productId: r.productId, qty: r.qty, rate: r.rate, gst: r.gst,
+        amount: r.qty * r.rate * (1 + r.gst / 100),
+      });
+      const product = allProducts.find((p) => p.id === r.productId);
+      if (product) {
+        const newStock = (product.stock || 0) + r.qty;
+        await DB.put("products", { ...product, stock: newStock });
+        await queueSync("products", product.id);
+        await DB.add("inventory", {
+          productId: r.productId, type: "purchase", qty: r.qty,
+          date: Date.now(), refType: "purchase", refId: purchaseId,
+          note: "Purchase invoice " + (document.getElementById("invoiceNo").value.trim() || "—"),
+        });
+      }
+    }
+
+    closeModal();
+    await loadReferenceData();
+    await loadPurchases();
+  });
+
+  document.querySelectorAll("[data-stub]").forEach(a => {
+    a.addEventListener("click", (e) => { e.preventDefault(); alert(a.dataset.stub + " isn't built yet."); });
+  });
+  document.getElementById("logoutBtn").addEventListener("click", () => { if (confirm("Log out now?")) logout(); });
+
+  (async () => {
+    await initDB();
+    await applyBranding();
+    const session = requireSession(["admin"]);
+    if (!session) return;
+    await loadReferenceData();
+    await loadPurchases();
+  })();
+</script>
+</body>
+</html>

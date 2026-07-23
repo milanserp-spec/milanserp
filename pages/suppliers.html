@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FoodERP Lite — Suppliers</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="mark">F</div><div class="name" id="brandName">FoodERP Lite</div></div>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <div class="section-label">Masters</div>
+      <a href="products.html">Products</a>
+      <a href="categories.html">Categories</a>
+      <a href="customers.html">Customers</a>
+      <a href="suppliers.html" class="active">Suppliers</a>
+      <div class="section-label">Operations</div>
+      <a href="purchase.html">Purchase</a>
+      <a href="production.html">Production</a>
+      <a href="inventory.html">Inventory</a>
+      <a href="sales.html">Sales</a>
+      <div class="section-label">Tools</div>
+      <a href="reports.html">Reports</a>
+      <a href="sync.html">Sync</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+    <button class="logout-btn" id="logoutBtn">Log Out</button>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div><h1>Suppliers</h1><div class="greeting">Vendors you buy raw materials or packaging from</div></div>
+    </div>
+
+    <div class="toolbar">
+      <input type="text" class="search-input" id="searchBox" placeholder="Search suppliers..." />
+      <button class="btn-add" id="addBtn">+ Add Supplier</button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Name</th><th>Contact Person</th><th>Phone</th><th>GST No.</th><th></th></tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="empty-note" id="emptyNote" style="display:none;">
+        <div class="icon-circle">🚚</div>
+        <h3>No suppliers yet</h3>
+        <p>Add a supplier so you can record purchases against them later.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" style="display:none;">
+  <div class="modal-card">
+    <h2 id="modalTitle">Add Supplier</h2>
+    <div class="modal-sub">Used in Purchase Entry (Phase 3) and GST reports</div>
+    <form id="supplierForm">
+      <input type="hidden" id="supplierId" />
+      <div class="form-grid">
+        <div class="field full">
+          <label for="name">Supplier / Company Name</label>
+          <input type="text" id="name" required placeholder="e.g. Sharma Traders" />
+        </div>
+        <div class="field">
+          <label for="contactPerson">Contact Person</label>
+          <input type="text" id="contactPerson" placeholder="e.g. Ramesh Sharma" />
+        </div>
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" placeholder="10-digit mobile number" />
+        </div>
+        <div class="field">
+          <label for="email">Email (optional)</label>
+          <input type="email" id="email" />
+        </div>
+        <div class="field">
+          <label for="gstNo">GST Number (optional)</label>
+          <input type="text" id="gstNo" placeholder="e.g. 22AAAAA0000A1Z5" />
+        </div>
+        <div class="field full">
+          <label for="address">Address</label>
+          <input type="text" id="address" />
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script>
+  let allSuppliers = [];
+
+  async function loadSuppliers() {
+    allSuppliers = await DB.getAll("suppliers");
+    renderTable(allSuppliers);
+  }
+
+  function renderTable(list) {
+    const body = document.getElementById("tableBody");
+    const empty = document.getElementById("emptyNote");
+    body.innerHTML = "";
+    if (list.length === 0) { empty.style.display = "block"; return; }
+    empty.style.display = "none";
+    list.forEach((s) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td><strong>${escapeHtml(s.name)}</strong></td>
+        <td>${escapeHtml(s.contactPerson || "—")}</td>
+        <td>${escapeHtml(s.phone || "—")}</td>
+        <td>${escapeHtml(s.gstNo || "—")}</td>
+        <td>
+          <div class="row-actions">
+            <button class="icon-btn" data-edit="${s.id}" title="Edit">✏️</button>
+            <button class="icon-btn danger" data-delete="${s.id}" title="Delete">🗑️</button>
+          </div>
+        </td>`;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll("[data-edit]").forEach(btn =>
+      btn.addEventListener("click", () => openModal(Number(btn.dataset.edit))));
+    body.querySelectorAll("[data-delete]").forEach(btn =>
+      btn.addEventListener("click", () => deleteSupplier(Number(btn.dataset.delete))));
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str ?? "";
+    return div.innerHTML;
+  }
+
+  function openModal(id) {
+    const form = document.getElementById("supplierForm");
+    form.reset();
+    document.getElementById("supplierId").value = "";
+    document.getElementById("modalTitle").textContent = "Add Supplier";
+    if (id) {
+      const s = allSuppliers.find((x) => x.id === id);
+      if (s) {
+        document.getElementById("modalTitle").textContent = "Edit Supplier";
+        document.getElementById("supplierId").value = s.id;
+        document.getElementById("name").value = s.name || "";
+        document.getElementById("contactPerson").value = s.contactPerson || "";
+        document.getElementById("phone").value = s.phone || "";
+        document.getElementById("email").value = s.email || "";
+        document.getElementById("gstNo").value = s.gstNo || "";
+        document.getElementById("address").value = s.address || "";
+      }
+    }
+    document.getElementById("modalOverlay").style.display = "flex";
+  }
+
+  function closeModal() { document.getElementById("modalOverlay").style.display = "none"; }
+
+  async function deleteSupplier(id) {
+    if (!confirm("Delete this supplier?")) return;
+    await DB.delete("suppliers", id);
+    await loadSuppliers();
+  }
+
+  document.getElementById("addBtn").addEventListener("click", () => openModal(null));
+  document.getElementById("cancelBtn").addEventListener("click", closeModal);
+  document.getElementById("modalOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "modalOverlay") closeModal();
+  });
+
+  document.getElementById("supplierForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = document.getElementById("supplierId").value;
+    const record = {
+      name: document.getElementById("name").value.trim(),
+      contactPerson: document.getElementById("contactPerson").value.trim(),
+      phone: document.getElementById("phone").value.trim(),
+      email: document.getElementById("email").value.trim(),
+      gstNo: document.getElementById("gstNo").value.trim(),
+      address: document.getElementById("address").value.trim(),
+      updatedAt: Date.now(),
+    };
+    if (id) { record.id = Number(id); await DB.put("suppliers", record); await queueSync("suppliers", record.id); }
+    else { record.createdAt = Date.now(); record.uid = genUID(); const newId = await DB.add("suppliers", record); await queueSync("suppliers", newId); }
+    closeModal();
+    await loadSuppliers();
+  });
+
+  document.getElementById("searchBox").addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase();
+    renderTable(allSuppliers.filter((s) => (s.name || "").toLowerCase().includes(q) || (s.phone || "").includes(q)));
+  });
+
+  document.querySelectorAll("[data-stub]").forEach(a => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      alert(a.dataset.stub + " isn't built yet. It will appear here once that phase is complete.");
+    });
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    if (confirm("Log out now?")) logout();
+  });
+
+  (async () => {
+    await initDB();
+    await applyBranding();
+    const session = requireSession(["admin"]);
+    if (!session) return;
+    await loadSuppliers();
+  })();
+</script>
+</body>
+</html>

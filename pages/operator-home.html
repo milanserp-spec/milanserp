@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>FoodERP Lite — Operator</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<div class="operator-shell">
+  <div class="operator-topbar">
+    <div class="who">👋 Hello, <span id="operatorName">Operator</span></div>
+    <button class="exit-btn" id="exitBtn">Log Out</button>
+  </div>
+
+  <div class="operator-grid">
+    <a class="big-tile accent" href="billing.html">
+      <div class="icon-circle">🧾</div>
+      <div class="tile-label">Billing</div>
+    </a>
+    <a class="big-tile accent" href="label-printing.html">
+      <div class="icon-circle">🏷️</div>
+      <div class="tile-label">Print Label</div>
+    </a>
+    <a class="big-tile accent" href="stock-entry.html">
+      <div class="icon-circle">📦</div>
+      <div class="tile-label">Add Stock</div>
+    </a>
+    <a class="big-tile" href="customer-search.html">
+      <div class="icon-circle">🔍</div>
+      <div class="tile-label">Find Customer</div>
+    </a>
+  </div>
+</div>
+
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script>
+  (async () => {
+    await initDB();
+    await applyBranding();
+    const session = requireSession(["operator", "admin"]);
+    if (!session) return;
+    document.getElementById("operatorName").textContent = session.name || "Operator";
+  })();
+
+  document.getElementById("exitBtn").addEventListener("click", () => {
+    if (confirm("Log out now?")) logout();
+  });
+</script>
+</body>
+</html>

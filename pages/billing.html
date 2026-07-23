@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>FoodERP Lite — Billing</title>
+<link rel="manifest" href="../manifest.json" />
+<meta name="theme-color" content="#1B4B43" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<!-- BILLING SCREEN (product picking) -->
+<div class="operator-shell" id="billingScreen">
+  <div class="operator-topbar">
+    <div class="who">🧾 Billing</div>
+    <a class="exit-btn" href="operator-home.html" style="text-decoration:none;">← Back</a>
+  </div>
+
+  <div class="billing-search" style="display:flex; gap:10px;">
+    <input type="text" id="searchBox" placeholder="🔍 Search product..." autofocus style="flex:1;" />
+    <button id="scanBtn" style="width:56px; flex-shrink:0; border:none; border-radius:var(--radius-md); background:var(--color-primary); color:#fff; font-size:1.3rem;">📷</button>
+  </div>
+
+  <div class="product-grid" id="productGrid"></div>
+
+  <div class="empty-note section-card" id="noProductsNote" style="display:none; margin:16px;">
+    <div class="icon-circle">🛒</div>
+    <h3>No products yet</h3>
+    <p>Ask the shop owner to add products from the Admin screen first.</p>
+  </div>
+
+  <button class="cart-bar" id="cartBar" disabled>
+    <span id="cartCount">🛒 0 items</span>
+    <span class="cart-total" id="cartTotalDisplay">₹0.00</span>
+  </button>
+</div>
+
+<!-- CHECKOUT MODAL -->
+<div class="modal-overlay" id="checkoutOverlay" style="display:none;">
+  <div class="modal-card" style="max-width:520px;">
+    <h2>Checkout</h2>
+    <div class="modal-sub">Review the order, then complete the sale</div>
+
+    <div id="cartLines" style="max-height:220px; overflow-y:auto;"></div>
+
+    <div class="field" style="margin-top:16px;">
+      <label for="customer">Customer</label>
+      <select id="customer">
+        <option value="">Walk-in Customer</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="discount">Discount (₹)</label>
+      <input type="number" id="discount" min="0" step="0.01" value="0" />
+    </div>
+
+    <div class="field">
+      <label>Payment Method</label>
+      <div class="pay-methods">
+        <button type="button" class="pay-method selected" data-pay="Cash">💵 Cash</button>
+        <button type="button" class="pay-method" data-pay="UPI">📱 UPI</button>
+        <button type="button" class="pay-method" data-pay="Card">💳 Card</button>
+        <button type="button" class="pay-method" data-pay="Credit">📒 Credit</button>
+      </div>
+    </div>
+
+    <div class="totals-box" style="margin-top:14px;">
+      <div class="totals-row"><span>Subtotal</span><span id="coSubtotal">₹0.00</span></div>
+      <div class="totals-row"><span>GST</span><span id="coGst">₹0.00</span></div>
+      <div class="totals-row"><span>Discount</span><span id="coDiscount">−₹0.00</span></div>
+      <div class="totals-row grand"><span>Total</span><span id="coTotal">₹0.00</span></div>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" id="backToItemsBtn">← Add More Items</button>
+      <button type="button" class="btn btn-primary" id="completeSaleBtn">✓ Complete Sale</button>
+    </div>
+  </div>
+</div>
+
+<!-- RECEIPT SCREEN -->
+<div class="operator-shell" id="receiptScreen" style="display:none;">
+  <div class="operator-topbar">
+    <div class="who">✅ Sale Complete</div>
+    <a class="exit-btn" href="operator-home.html" style="text-decoration:none;">Home</a>
+  </div>
+  <div style="padding:20px; max-width:420px; margin:0 auto; width:100%;">
+    <div class="receipt" id="receiptContent"></div>
+    <div style="display:flex; gap:10px; margin-top:18px;">
+      <button class="btn btn-ghost" id="printBtn">🖨️ Browser Print</button>
+      <button class="btn btn-accent" id="btPrintBtn">📶 Bluetooth Print</button>
+    </div>
+    <button class="btn btn-primary" id="newSaleBtn" style="margin-top:10px;">➕ New Sale</button>
+    <p style="text-align:center; color:var(--color-text-muted); font-size:var(--fs-xs); margin-top:10px;">
+      Bluetooth print needs a connected BLE thermal printer (set up once from Label Printing). Not every printer model is supported — see the note there.
+    </p>
+  </div>
+</div>
+
+<script src="../js/db.js"></script>
+<script src="../js/branding.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/scanner.js"></script>
+<script src="../js/printing.js"></script>
+<script>
+  let allProducts = [];
+  let allCustomers = [];
+  let cart = []; // {productId, name, price, gst, unit, qty}
+  let selectedPayment = "Cash";
+  let session = null;
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str ?? "";
+    return div.innerHTML;
+  }
+  function money(n) { return "₹" + Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  /* ---------- Product grid ---------- */
+
+  function renderGrid(filter) {
+    const grid = document.getElementById("productGrid");
+    const empty = document.getElementById("noProductsNote");
+    grid.innerHTML = "";
+
+    const active = allProducts.filter((p) => p.status !== "inactive");
+    if (active.length === 0) { empty.style.display = "block"; return; }
+    empty.style.display = "none";
+
+    const q = (filter || "").toLowerCase();
+    const list = q ? active.filter((p) => p.name.toLowerCase().includes(q) || (p.code || "").toLowerCase().includes(q)) : active;
+
+    list.forEach((p) => {
+      const inCart = cart.find((c) => c.productId === p.id);
+      const btn = document.createElement("button");
+      btn.className = "product-tile";
+      btn.innerHTML = `
+        ${inCart ? `<span class="qty-badge">${inCart.qty}</span>` : ""}
+        <div class="p-name">${escapeHtml(p.name)}</div>
+        <div class="p-price">${money(p.sellingPrice)}</div>
+        <div class="p-stock">Stock: ${p.stock ?? 0} ${escapeHtml(p.unit || "")}</div>
+      `;
+      btn.addEventListener("click", () => addToCart(p));
+      grid.appendChild(btn);
+    });
+  }
+
+  function addToCart(product) {
+    const existing = cart.find((c) => c.productId === product.id);
+    if (existing) existing.qty += 1;
+    else cart.push({ productId: product.id, name: product.name, price: product.sellingPrice || 0, gst: product.gst || 0, unit: product.unit || "", qty: 1 });
+    refreshCartUI();
+    renderGrid(document.getElementById("searchBox").value);
+  }
+
+  function cartTotals() {
+    const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
+    const gst = cart.reduce((s, c) => s + c.price * c.qty * (c.gst / 100), 0);
+    return { subtotal, gst };
+  }
+
+  function refreshCartUI() {
+    const count = cart.reduce((s, c) => s + c.qty, 0);
+    const { subtotal, gst } = cartTotals();
+    document.getElementById("cartCount").textContent = `🛒 ${count} item${count === 1 ? "" : "s"}`;
+    document.getElementById("cartTotalDisplay").textContent = money(subtotal + gst);
+    document.getElementById("cartBar").disabled = count === 0;
+  }
+
+  document.getElementById("searchBox").addEventListener("input", (e) => renderGrid(e.target.value));
+
+  document.getElementById("scanBtn").addEventListener("click", async () => {
+    try {
+      const code = await openScanner();
+      if (!code) return;
+      const product = allProducts.find((p) => p.barcode && p.barcode === code);
+      if (product) {
+        addToCart(product);
+      } else {
+        document.getElementById("searchBox").value = code;
+        renderGrid(code);
+        alert("No product matches that barcode exactly — showing closest search results instead.");
+      }
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  /* ---------- Checkout modal ---------- */
+
+  function renderCartLines() {
+    const wrap = document.getElementById("cartLines");
+    wrap.innerHTML = "";
+    cart.forEach((c) => {
+      const row = document.createElement("div");
+      row.className = "cart-line";
+      row.innerHTML = `
+        <div>
+          <div class="ci-name">${escapeHtml(c.name)}</div>
+          <div class="ci-price">${money(c.price)} / ${escapeHtml(c.unit)}</div>
+        </div>
+        <div class="qty-stepper">
+          <button type="button" class="qty-minus">−</button>
+          <span class="qty-val">${c.qty}</span>
+          <button type="button" class="qty-plus">+</button>
+        </div>
+        <div class="ci-total">${money(c.price * c.qty)}</div>
+        <button type="button" class="ci-remove">✕</button>
+      `;
+      row.querySelector(".qty-plus").addEventListener("click", () => { c.qty += 1; renderCartLines(); refreshCartUI(); recalcCheckout(); });
+      row.querySelector(".qty-minus").addEventListener("click", () => {
+        c.qty -= 1;
+        if (c.qty <= 0) cart = cart.filter((x) => x !== c);
+        renderCartLines(); refreshCartUI(); recalcCheckout();
+        if (cart.length === 0) closeCheckout();
+      });
+      row.querySelector(".ci-remove").addEventListener("click", () => {
+        cart = cart.filter((x) => x !== c);
+        renderCartLines(); refreshCartUI(); recalcCheckout();
+        if (cart.length === 0) closeCheckout();
+      });
+      wrap.appendChild(row);
+    });
+  }
+
+  function recalcCheckout() {
+    const { subtotal, gst } = cartTotals();
+    const discount = Number(document.getElementById("discount").value || 0);
+    const total = Math.max(0, subtotal + gst - discount);
+    document.getElementById("coSubtotal").textContent = money(subtotal);
+    document.getElementById("coGst").textContent = money(gst);
+    document.getElementById("coDiscount").textContent = "−" + money(discount);
+    document.getElementById("coTotal").textContent = money(total);
+  }
+
+  function populateCustomerSelect() {
+    const select = document.getElementById("customer");
+    select.innerHTML = `<option value="">Walk-in Customer</option>` +
+      allCustomers.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}${c.phone ? " — " + escapeHtml(c.phone) : ""}</option>`).join("");
+  }
+
+  function openCheckout() {
+    if (cart.length === 0) return;
+    populateCustomerSelect();
+    document.getElementById("discount").value = 0;
+    selectedPayment = "Cash";
+    document.querySelectorAll(".pay-method").forEach((b) => b.classList.toggle("selected", b.dataset.pay === "Cash"));
+    renderCartLines();
+    recalcCheckout();
+    document.getElementById("checkoutOverlay").style.display = "flex";
+  }
+  function closeCheckout() { document.getElementById("checkoutOverlay").style.display = "none"; }
+
+  document.getElementById("cartBar").addEventListener("click", openCheckout);
+  document.getElementById("backToItemsBtn").addEventListener("click", closeCheckout);
+  document.getElementById("discount").addEventListener("input", recalcCheckout);
+
+  document.querySelectorAll(".pay-method").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".pay-method").forEach((b) => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      selectedPayment = btn.dataset.pay;
+    });
+  });
+
+  /* ---------- Complete sale ---------- */
+
+  async function nextInvoiceNo() {
+    const lastRec = await DB.get("settings", "lastInvoiceNo");
+    const prefixRec = await DB.get("settings", "invoicePrefix");
+    const nextNum = ((lastRec && lastRec.value) || 0) + 1;
+    await DB.put("settings", { key: "lastInvoiceNo", value: nextNum });
+    const prefix = (prefixRec && prefixRec.value) || "INV-";
+    return prefix + String(nextNum).padStart(4, "0");
+  }
+
+  document.getElementById("completeSaleBtn").addEventListener("click", async () => {
+    if (cart.length === 0) return;
+
+    for (const c of cart) {
+      const product = allProducts.find((p) => p.id === c.productId);
+      if (product && (product.stock || 0) < c.qty) {
+        if (!confirm(`Only ${product.stock ?? 0} ${product.unit || ""} of ${product.name} left in stock. Continue anyway?`)) return;
+      }
+    }
+
+    const { subtotal, gst } = cartTotals();
+    const discount = Number(document.getElementById("discount").value || 0);
+    const total = Math.max(0, subtotal + gst - discount);
+    const customerId = document.getElementById("customer").value ? Number(document.getElementById("customer").value) : null;
+    const customer = allCustomers.find((c) => c.id === customerId);
+    const invoiceNo = await nextInvoiceNo();
+    const now = Date.now();
+
+    const saleId = await DB.add("sales", {
+      uid: genUID(),
+      invoiceNo, date: now, customerId,
+      customerUid: customer ? customer.uid || null : null,
+      customerName: customer ? customer.name : "Walk-in Customer",
+      subtotal, gst, discount, total,
+      payment: selectedPayment,
+      operatorId: session ? session.id : null,
+      operatorName: session ? session.name : "—",
+      synced: false,
+    });
+
+    for (const c of cart) {
+      await DB.add("sale_items", {
+        saleId, productId: c.productId, name: c.name, price: c.price, qty: c.qty, gst: c.gst,
+        amount: c.price * c.qty * (1 + c.gst / 100),
+      });
+      const product = allProducts.find((p) => p.id === c.productId);
+      if (product) {
+        const newStock = Math.max(0, (product.stock || 0) - c.qty);
+        await DB.put("products", { ...product, stock: newStock });
+        await queueSync("products", product.id);
+        await DB.add("inventory", {
+          productId: c.productId, type: "sale", qty: c.qty, date: now,
+          refType: "sale", refId: saleId, note: "Invoice " + invoiceNo,
+        });
+      }
+    }
+
+    await queueSync("sales", saleId);
+
+    showReceipt({ invoiceNo, date: now, customerName: customer ? customer.name : "Walk-in Customer", payment: selectedPayment, subtotal, gst, discount, total, items: [...cart] });
+
+    cart = [];
+    allProducts = await DB.getAll("products");
+    refreshCartUI();
+    renderGrid("");
+    closeCheckout();
+  });
+
+  let lastSale = null;
+
+  function showReceipt(sale) {
+    lastSale = sale;
+    const company = (window._companySettings && window._companySettings.name) || "My Food Business";
+    const lines = sale.items.map((c) =>
+      `<div class="r-row"><span>${escapeHtml(c.name)} x${c.qty}</span><span>${money(c.price * c.qty)}</span></div>`
+    ).join("");
+
+    document.getElementById("receiptContent").innerHTML = `
+      <div class="r-center"><strong>${escapeHtml(company)}</strong></div>
+      <div class="r-center" style="font-size:0.8rem;">Invoice: ${escapeHtml(sale.invoiceNo)}</div>
+      <div class="r-center" style="font-size:0.8rem;">${new Date(sale.date).toLocaleString("en-IN")}</div>
+      <hr>
+      <div style="font-size:0.85rem;">Customer: ${escapeHtml(sale.customerName)}</div>
+      <hr>
+      ${lines}
+      <hr>
+      <div class="r-row"><span>Subtotal</span><span>${money(sale.subtotal)}</span></div>
+      <div class="r-row"><span>GST</span><span>${money(sale.gst)}</span></div>
+      <div class="r-row"><span>Discount</span><span>−${money(sale.discount)}</span></div>
+      <div class="r-row total"><span>TOTAL</span><span>${money(sale.total)}</span></div>
+      <hr>
+      <div class="r-row"><span>Payment</span><span>${escapeHtml(sale.payment)}</span></div>
+      <hr>
+      <div class="r-center" style="font-size:0.8rem;">Thank you for your purchase!</div>
+    `;
+
+    document.getElementById("billingScreen").style.display = "none";
+    document.getElementById("receiptScreen").style.display = "flex";
+    document.getElementById("receiptScreen").style.flexDirection = "column";
+  }
+
+  document.getElementById("printBtn").addEventListener("click", () => window.print());
+
+  document.getElementById("btPrintBtn").addEventListener("click", async () => {
+    if (!lastSale) return;
+    if (!isPrinterConnected()) {
+      alert("No Bluetooth printer connected. Set one up from Label Printing, then come back here.");
+      return;
+    }
+    try {
+      await printReceipt({ ...lastSale, companyName: (window._companySettings && window._companySettings.name) || "My Food Business" });
+    } catch (err) {
+      alert("Couldn't print: " + err.message);
+    }
+  });
+
+  document.getElementById("newSaleBtn").addEventListener("click", () => {
+    document.getElementById("receiptScreen").style.display = "none";
+    document.getElementById("billingScreen").style.display = "flex";
+  });
+
+  /* ---------- Init ---------- */
+
+  (async () => {
+    await initDB();
+    await applyBranding();
+    session = requireSession(["operator", "admin"]);
+    if (!session) return;
+    allProducts = await DB.getAll("products");
+    allCustomers = await DB.getAll("customers");
+    const companyRec = await DB.get("settings", "company");
+    window._companySettings = companyRec ? companyRec.value : {};
+    renderGrid("");
+    refreshCartUI();
+  })();
+</script>
+</body>
+</html>
