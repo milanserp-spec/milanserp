@@ -197,8 +197,6 @@ async function pullSync(onProgress) {
       if (!remoteRecord.uid) continue;
       if (pendingUids.has(remoteRecord.uid)) { skipped++; continue; }
 
-      // Resolve a foreign-key uid (e.g. productUid) back to this device's
-      // own local numeric id, so existing report/list lookups keep working.
       const fk = FK_MAPS[table];
       if (fk && remoteRecord[fk.uidField]) {
         const matches = await DB.getByIndex(fk.table, "uid", remoteRecord[fk.uidField]);
